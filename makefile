@@ -49,6 +49,12 @@ basics.o: basics.c basics.h makefile
 toint: toint.c makefile
 	gcc $(CFLAGS) -o toint toint.c
 
+
+test: xrepair despair
+	xrepair README 100
+	despair README
+	cmp README README.out
+
 clean:
 	rm -f $(EXECS) *.o
 
