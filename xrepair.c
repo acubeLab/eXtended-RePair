@@ -342,7 +342,9 @@ relong repair(FILE *R)
     printf("--- third stage, n=%lli\n", c);
   if (PRNC)
     prnC();
+  printf("repair: rules:%lld maxRules=%lld\n",n-alph,maxRules);
   while (n + 1 > 0 && (n-alph) < maxRules) {
+    printf("repair2: rules:%lld maxRules=%lld\n",n-alph,maxRules);
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
@@ -517,7 +519,7 @@ int main(int argc, char **argv)
   /* ----- -------- read options from command line ----------- */
   int save_space=0;
   maxRules= INT64_MAX;
-  maxForbiddenChar= 255;
+  maxForbiddenChar= -1;
   Verbose=0;
   opterr = 0;
   while ((c=getopt(argc, argv, "r:x:vs")) != -1) {
@@ -529,10 +531,14 @@ int main(int argc, char **argv)
       save_space=1;
       break;
     case 'r':
-      maxRules=atoi(optarg);
+      maxRules=atol(optarg);
       break;
     case 'x':
       maxForbiddenChar=atoi(optarg);
+      if(maxForbiddenChar<0 || maxForbiddenChar>255) {
+        fprintf(stderr,"-x option must be in [0-255]\n");
+        exit(1);
+      }
       break;
     case '?':
       fprintf(stderr,"Unknown option: %c\n", optopt);
@@ -544,10 +550,6 @@ int main(int argc, char **argv)
     for(int i=0; i<argc; i++)
       fprintf(stderr," %s",argv[i]);
     fputs("\n",stderr);
-  }
-  if(maxForbiddenChar<0 || maxForbiddenChar>255) {
-    fprintf(stderr,"-x option must be in [0-255]\n");
-    exit(1);
   }
   if(maxRules<0) {
     fprintf(stderr,"-r option must be > 0\n");
@@ -642,7 +644,7 @@ int main(int argc, char **argv)
   }
   if (PRNCf)
     prnC();
-  // free whai is possible
+  // free what is possible
   free(C); free(L);  
 
   // ------------- report compression statistics
