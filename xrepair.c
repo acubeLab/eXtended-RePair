@@ -105,9 +105,9 @@ Trarray Rec; // records
 
 
 // globals controlled by the input parameters
-static int maxForbiddenChar; // do not generate rules involving chars <= this
+static int32_t maxForbiddenChar; // do not generate rules involving chars <= this
 // default is -1, i.e. no restriction
-static long maxRules;        // max number of rules to generate
+static int64_t maxRules;        // max number of rules to generate
 // default -1, i.e. no restriction
 static int Verbose;
 
@@ -516,8 +516,8 @@ int main(int argc, char **argv)
 
   /* ----- -------- read options from command line ----------- */
   int save_space=0;
-  maxRules=-1;
-  maxForbiddenChar=-1;
+  maxRules= INT64_MAX;
+  maxForbiddenChar= 255;
   Verbose=0;
   opterr = 0;
   while ((c=getopt(argc, argv, "r:x:vs")) != -1) {
@@ -530,17 +530,9 @@ int main(int argc, char **argv)
       break;
     case 'r':
       maxRules=atoi(optarg);
-      if(maxRules<0) {
-        fprintf(stderr,"-r option must be > 0\n");
-        exit(1);
-      }
       break;
     case 'x':
       maxForbiddenChar=atoi(optarg);
-      if(maxForbiddenChar<0 || maxForbiddenChar>255) {
-        fprintf(stderr,"-x option must be in [0-255]\n");
-        exit(1);
-      }
       break;
     case '?':
       fprintf(stderr,"Unknown option: %c\n", optopt);
@@ -553,6 +545,15 @@ int main(int argc, char **argv)
       fprintf(stderr," %s",argv[i]);
     fputs("\n",stderr);
   }
+  if(maxForbiddenChar<0 || maxForbiddenChar>255) {
+    fprintf(stderr,"-x option must be in [0-255]\n");
+    exit(1);
+  }
+  if(maxRules<0) {
+    fprintf(stderr,"-r option must be > 0\n");
+    exit(1);
+  }
+
   // virtually get rid of options from the command line
   optind -=1;
   if (argc-optind != 2) usage_and_exit(argv[0]);
