@@ -342,9 +342,8 @@ relong repair(FILE *R)
     printf("--- third stage, n=%lli\n", c);
   if (PRNC)
     prnC();
-  printf("repair: rules:%lld maxRules=%lld\n",n-alph,maxRules);
+  // printf("repair: rules:%lld maxRules=%lld\n",n-alph,maxRules);
   while (n + 1 > 0 && (n-alph) < maxRules) {
-    printf("repair2: rules:%lld maxRules=%lld\n",n-alph,maxRules);
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
