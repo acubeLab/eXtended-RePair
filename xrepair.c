@@ -5,23 +5,29 @@
   by Gonzalo Navarro with the following additional options:
     -x C    [do not generate rules involving chars <= C]
     -r R    [do not generate more than R rules]
-  required input parameters are the input file name and the amount of memory
-  allotted to the program in MB. The program produces two files:
+    -s      [try to save space computing the first 2^16-2^8 rules
+             using a quadratic algorithm]
+  The input file name is a required input parameter. 
+  The program produces two files:
     - a file with extension .R containing the rules
     - a file with extension .C containing the compressed text
-  The amount of memory only affects the runing time, not the output.
+  The option -s only affects the running time, not the output.
 
 
   This code is derived by the large and balanced repair implementation,
   which used the following approach: since the working memory is dominated
-  by the term tlen * 3 * sizeof(long long) [=24*tlen] in case the
-  available memory is smaller than than size it tries to reduce the length
-  applying 2^16 - 2^8 rules (that is until rule IDs fit in a short)
-  using quadratic (but memory efficient) repair algorithm
+  by the term tlen * 3 * sizeof(long long) [=24*tlen] when the option -s
+  is specified, we compute the first 2^16-2^8 rules storing the input in an
+  array of shorts and using a quadratic algorithm (one a rule is found is 
+  applied with a complete scan on the input). This will hopefully significantly 
+  reduce the length of the working sequence so that the complete machinery
+  for the linear time algoritm fits in the available memory.
 
 */
 
 /*
+
+Original notice by Gonzalo Navarro:
 
 Repair -- an implementation of Larsson and Moffat's compression and
 decompression algorithms.
@@ -74,17 +80,15 @@ void prnsC(unsigned short *, relong len);
 void prnC(void);
 void prnRec(void);
 static void quit(const char *s);
+static void *mymalloc(size_t size, int line, const char *file);
+static void *myrealloc(void *ptr, size_t size, int line, const char *file);
 static void usage_and_exit(char *name);
-
-
 
 
 float factor = 0.75; // 1/extra space overhead; set closer to 1 for smaller
                      // and slower execution
 int minsize = 256;   // to avoid many reallocs at small sizes, should be ok as is
 
-unsigned char *text; // first pass over this char array
-unsigned short *sC; // shorts version of C
 relong *C; // compressed text, pero tiene -ptrs al mismo texto
 
 relong u; // |text| and later current |C| with gaps
@@ -101,12 +105,11 @@ Trarray Rec; // records
 
 
 // globals controlled by the input parameters
-int MB;                    // available main memory in MBs
-int maxForbiddenChar = -1; // do not generate rules involving chars <= this
+static int maxForbiddenChar; // do not generate rules involving chars <= this
 // default is -1, i.e. no restriction
-long maxRules = -1;        // max number of rules to generate
+static long maxRules;        // max number of rules to generate
 // default -1, i.e. no restriction
-int Verbose=0;
+static int Verbose;
 
 
 // return true if this pair of symbols should never appear
@@ -174,7 +177,7 @@ void prepare(uint8_t *text, uint16_t *text16, relong len)
   int id;
   Tpair pair;
   c = u = len;
-  C = (void *)malloc(u * sizeof(relong));
+  C = mymalloc(u * sizeof(relong),__LINE__,__FILE__);
   if (text16 != NULL) {
     assert(text==NULL);
     for (i = 0; i < u; i++)
@@ -188,7 +191,7 @@ void prepare(uint8_t *text, uint16_t *text16, relong len)
     free(text);
   }
   // init prev/next list L
-  L = (void *)malloc(u * sizeof(Tlist));
+  L = mymalloc(u * sizeof(Tlist),__LINE__,__FILE__);
   assocRecords(&Rec, &Hash, &Heap, L);
   for (i = 0; i < c - 1; i++) {
     pair.left = C[i];
@@ -224,8 +227,8 @@ void prepare(uint8_t *text, uint16_t *text16, relong len)
 
 
 
-// second pass, work on a version of shorts, until the structure fits
-// in MB, or until shorts are insufficient
+// second pass, work on a version of shorts until shorts are insufficient
+// TODO: until the structure fits in MB, or 
 relong repair1(uint16_t *sC, relong len, FILE *R)
 {
   int oid, id;
@@ -237,12 +240,9 @@ relong repair1(uint16_t *sC, relong len, FILE *R)
     printf("--- second stage, n=%lli\n", len);
   if (PRNC)
     prnsC(sC,len);
-  while (n < 1 << 16) {
-    if ((len / 1024 / 1024) * 3 * sizeof(relong) <= MB)
-      return len;
-    else if (PRNP)
-      printf("Avoiding to use %lli MB\n",
-             (len / 1024 / 1024) * 3 * sizeof(relong));
+  while (n < 1 << 16 && (n-alph) < maxRules) {
+    // if ((len / 1024 / 1024) * 3 * sizeof(relong) <= MB)
+    //  return len;
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
@@ -322,7 +322,6 @@ relong repair1(uint16_t *sC, relong len, FILE *R)
     removeRecord(&Rec, oid);
     n++;
     purgeHeap(&Heap);                      // remove freq 1 from heap
-    sC = realloc(sC, len * sizeof(short)); // should not move it
   }
   purgeHeap(&Heap); // remove freq 1 from heap, if it exited for oid=-1
   return len;
@@ -343,7 +342,7 @@ relong repair(FILE *R)
     printf("--- third stage, n=%lli\n", c);
   if (PRNC)
     prnC();
-  while (n + 1 > 0) {
+  while (n + 1 > 0 && (n-alph) < maxRules) {
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
@@ -515,12 +514,19 @@ int main(int argc, char **argv)
   relong i, olen, len;
   struct stat s;
 
-  /* ------------- read options from command line ----------- */
+  /* ----- -------- read options from command line ----------- */
+  int save_space=0;
+  maxRules=-1;
+  maxForbiddenChar=-1;
+  Verbose=0;
   opterr = 0;
-  while ((c=getopt(argc, argv, "m:x:v")) != -1) {
+  while ((c=getopt(argc, argv, "r:x:vs")) != -1) {
     switch (c) {
     case 'v':
       Verbose++;
+      break;
+    case 's':
+      save_space=1;
       break;
     case 'r':
       maxRules=atoi(optarg);
@@ -549,15 +555,10 @@ int main(int argc, char **argv)
   }
   // virtually get rid of options from the command line
   optind -=1;
-  if (argc-optind != 3) usage_and_exit(argv[0]);
+  if (argc-optind != 2) usage_and_exit(argv[0]);
   argv += optind;
   argc -= optind;
-  MB = atoi(argv[2]);
-  if (MB <= 0) {
-    fprintf(stderr, "Available memory must be non negative\n");
-    exit(1);
-  }
-
+  
   // ----- read input
   if (stat(argv[1], &s) != 0) {
     fprintf(stderr, "Error: cannot stat file %s\n", argv[1]);
@@ -569,8 +570,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Error: cannot open file %s for reading\n", argv[1]);
     exit(1);
   }
-  uint8_t *text = (void *)malloc(len * sizeof(char));
-  if (fread(text, 1, len, Tf) != len) {
+  uint8_t *text8 = mymalloc(len * sizeof(char),__LINE__,__FILE__);
+  if (fread(text8, 1, len, Tf) != len) {
     fprintf(stderr, "Error: cannot read file %s\n", argv[1]);
     exit(1);
   }
@@ -586,25 +587,29 @@ int main(int argc, char **argv)
 
 
   // ------------- stage 0  (init)
-  init(text, len, Rf);
-  // ------------- stage 1  (for long files)
-  if ((len / 1024 / 1024) * 3 * sizeof(relong) > MB) {
+  init(text8, len, Rf);
+  // ------------- stage 1  (if option -s is specified)
+  if (save_space>0) {
     // do the quadratic phase using uint16_t
-    uint16_t *text16 = (void *)malloc(len * sizeof(uint16_t));
-    if(text16==NULL) quit("Out of memory in main()");
-    for (i = 0; i < len; i++)
-      text16[i] = text[i];
-    free(text);
+    uint16_t *text16 = myrealloc(text8, len * sizeof(uint16_t),__LINE__,__FILE__);
+    text8 = (uint8_t *) text16;
+    // convert inplace from char to short
+    for (long i = len-1; i >=0; i--) {
+      uint16_t c = text8[i];
+      assert(c<256);
+      text16[i] = c;
+    }
     // work on the short version as much as possible 
     len = repair1(text16, len, Rf);
     if (PRNL) printf("---end of stage 1, size=%lld\n",len);
     assert(len>0);
+    text16 = myrealloc(text16, len * sizeof(uint16_t),__LINE__,__FILE__);
     prepare(NULL, text16, len); // text16 is freed here
   }
   else {
     // go directly from char to relong 
     if (PRNL) printf("---skipping stage 1\n");
-    prepare(text, NULL, len); // text is freed here
+    prepare(text8, NULL, len); // text8 is freed here
   }
   // ------------ final stage
   repair(Rf);
@@ -652,7 +657,7 @@ int main(int argc, char **argv)
   fprintf(stderr, "   Number of rules: %i\n", n - alph);
   fprintf(stderr, "   Final sequence length: %lli (integers)\n", c);
   fprintf(stderr, "   Estimated output size (bytes): %ld\n", est_size);
-  fprintf(stderr, "   Compression ratio: %0.2f%%\n", (100.0 * est_size) / olen);
+  fprintf(stderr, "   Estimated compression ratio: %0.2f%%\n", (100.0 * est_size) / olen);
   // original estimate (4.0*(n-alph)+((n-alph)+c)*(float)blog(n-1))/(olen*8.0)*100.0);
   exit(0);
 }
@@ -715,6 +720,7 @@ static void usage_and_exit(char *name)
 {
   fprintf(stderr,"Usage:\n\t  %s [options] infile MB\n",name);
   fprintf(stderr,"\t\t-v             verbose\n");
+  fprintf(stderr,"\t\t-s             slower but save some space \n");
   fprintf(stderr,"\t\t-r num         max number of rules (def. no limit)\n");
   fprintf(stderr,"\t\t-x mul         largest char ignored by rules def. none\n\n");
   exit(1);
@@ -726,4 +732,27 @@ static void quit(const char *s)
   if(errno==0) fprintf(stderr,"%s\n",s);
   else  perror(s);
   exit(1);
+}
+
+// malloc and exit if out of memory
+static void *mymalloc(size_t size, int line, const char *file)
+{
+  void *v=malloc(size);
+  if(v==NULL) {
+    fprintf(stderr,"Out of memory allocating %zu bytes" 
+                 "at line %d of file %s\n",size,line,file);
+    exit(3);
+  }
+  return v;
+}
+
+static void *myrealloc(void *ptr, size_t size, int line, const char *file)
+{
+  void *v=realloc(ptr,size);
+  if(v==NULL) {
+    fprintf(stderr,"Out of memory allocating %zu bytes" 
+                 "at line %d of file %s\n",size,line,file);
+    exit(3);
+  }
+  return v;
 }

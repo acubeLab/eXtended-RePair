@@ -51,7 +51,7 @@ toint: toint.c makefile
 
 
 test: xrepair despair
-	xrepair README 100
+	xrepair README 
 	despair README
 	cmp README README.out
 
