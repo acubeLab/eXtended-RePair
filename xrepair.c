@@ -17,10 +17,9 @@
   This code is derived by the large and balanced repair implementation,
   which used the following approach: since the working memory 
   of the linear time algorithm is dominated by the term 
-     tlen * 3 * sizeof(long long) [=24*tlen]   until that size
-  fits in the available memory the algorithm uses a quadratic update 
-  (once a rule is found is applied with a complete scan on the input). 
-
+     tlen * 3 * sizeof(long long) [=24*tlen]   
+  until that size fits in the available memory we use a quadratic update 
+  (once a rule is found it is applied with a complete scan on the input). 
 */
 
 /*
@@ -75,16 +74,16 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #define PRNCf (Verbose>2)  // print final sequence C
 #define PRNP  (Verbose>1)  // print forming pairs
 #define PRNL  (Verbose>1)  // print progress on text scan
-void prnSym(uint32_t c);
-void prnsC(uint32_t *, relong len);
-void prnC(void);
-void prnRec(void);
+static void prnSym(uint32_t c);
+static void prnsC(uint32_t *, relong len);
+static void prnC(void);
+static void prnRec(void);
 static void quit(const char *s);
 static void *mymalloc(size_t size, int line, const char *file);
 void *myrealloc(void *ptr, size_t size, int line, const char *file);
 static void usage_and_exit(char *name);
 
-
+// ugly globals
 float factor = 0.75; // 1/extra space overhead; set closer to 1 for smaller
                      // and slower execution
 int minsize = 256;   // to avoid many reallocs at small sizes, should be ok as is
@@ -115,7 +114,8 @@ static int32_t maxMB;             // available memory in MBs
 static int Verbose;
 
 
-// return true if this pair of symbols should never appear
+// return true if forbidden chars are enabled 
+// and this pair of symbols should never appear
 // as the left-hand side of a rule
 int forbidden_pair(relong left, relong right)
 {
@@ -182,7 +182,7 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
   purgeHeap(&Heap); // remove pairs with freq==1
 }
 
-// prepare for the use the full machinery:
+// prepare for the use of the full machinery:
 //   copy text[] to C[], free text[] 
 //   init the prev/next array L[]
 void prepare(uint32_t *text, relong len)
@@ -233,11 +233,9 @@ void prepare(uint32_t *text, relong len)
 }
 
 
-
-
 // first pass consisting in the repair algorithm done using just an
 // uint32_t array and a quadratic update algorithm
-// called if -m option was used until the the full 24*len structure
+// called if -m option was used and until the the full 24*len structure
 // fits in the available memory
 relong repair32q(uint32_t *sC, relong len, FILE *R)
 {
@@ -248,7 +246,9 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
   int left, right;
   if (PRNC)
     prnsC(sC,len);
-  while ((n-alph) < maxRules) {
+  // n is the id of the next rule, n-alpha the number of rules so far
+  // stop if rule id becomes invalid or we reached the desired number of rules
+  while (n<=UINT32_MAX && (n-alph) < maxRules) {
     if ((len / 1024 / 1024) * 3 * sizeof(relong) < maxMB)
       return len;
     if (PRNR)
@@ -352,11 +352,12 @@ relong repair(FILE *R)
     printf("--- final stage, n=%lli\n", c);
   if (PRNC)
     prnC();
-  while ((n-alph) < maxRules) {
+  // n is the id of the next rule, n-alpha the number of rules so far
+  // stop if rule id becomes invalid or we reached the desired number of rules
+  while (n<=UINT32_MAX && (n-alph) < maxRules) {
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
-    // printf("oid: %d\n",oid);
     if (oid == -1)
       break; // the end!!
     orec = &Rec.records[oid];
@@ -668,7 +669,7 @@ int main(int argc, char **argv)
 
 
 // functions printing debug information 
-void prnSym(uint32_t c)
+static void prnSym(uint32_t c)
 {
   if (c < alph)
     printf("%c", c);
@@ -677,7 +678,7 @@ void prnSym(uint32_t c)
 }
 
 
-void prnsC(uint32_t *sC, relong len)
+static void prnsC(uint32_t *sC, relong len)
 {
   relong i = 0;
   printf("C[1..%lli] = ", len);
@@ -690,7 +691,7 @@ void prnsC(uint32_t *sC, relong len)
 }
 
 
-void prnC(void)
+static void prnC(void)
 {
   relong i = 0;
   printf("C[1..%lli] = ", c);
@@ -704,7 +705,7 @@ void prnC(void)
   printf("\n\n");
 }
 
-void prnRec(void)
+static void prnRec(void)
 {
   int i;
   printf("Active pairs:\n");

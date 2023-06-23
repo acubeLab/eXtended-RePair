@@ -1,0 +1,19 @@
+21/6/23 xrepair.c
+
+uint8 input. 
+No Mem parameter but option -s to trigger the use of a quadratic algorithm for the first 2^16 - 2^8 rules: discarded since it can be very slow: 48K seconds vs 2.7k even if the pspce was 22G vs 177GB
+Non terminals are int32
+Indexes with the input sequence are int64. prev/next fields in L are int64. Since the main array C[] can also store indices each entry is an int64_t. Replacing indices with with offsets we could store int32 in C (a gap larger than 2GB is unlikely)
+
+
+23/6/23 xrepair.c 
+
+uint8 input but easy to adapt to uint32 inputs
+Input is always loaded into a uint32 sequence (so space 4n is required)
+Uses the qudratic update algorithm until the full machinery for linear time 
+update fits into maxMB.
+Still have to check everything works when we have more than 2^31 symbols
+(some variables storing symbols are int, so the sign could be a problem)
+
+
+
