@@ -548,13 +548,13 @@ int main(int argc, char **argv)
         fprintf(stderr,"-r option must be non negative\n"); exit(1);
       }
       break;
-    case 'x':
+    case 'x': {
       long maxfc =atol(optarg);
       if(maxfc<0 || maxfc> UINT32_MAX) {
         fprintf(stderr,"-x option must be between 0 and 2^32-1\n");
         exit(1);
       } else maxForbiddenChar = maxfc;
-      break;
+      break; }
     case '?':
       fprintf(stderr,"Unknown option: %c\n", optopt);
       exit(1);
