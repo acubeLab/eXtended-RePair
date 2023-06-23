@@ -5,23 +5,21 @@
   by Gonzalo Navarro with the following additional options:
     -x C    [do not generate rules involving chars <= C]
     -r R    [do not generate more than R rules]
-    -s      [try to save space computing the first 2^16-2^8 rules
-             using a quadratic algorithm]
+    -m M    [use a quadratic algorithm until the full linear time
+             machinery fits in M MBs ]
   The input file name is a required input parameter. 
   The program produces two files:
     - a file with extension .R containing the rules
     - a file with extension .C containing the compressed text
-  The option -s only affects the running time, not the output.
-
+  The option -m can greatly affect the running time, it should not 
+  the affect the output.
 
   This code is derived by the large and balanced repair implementation,
-  which used the following approach: since the working memory is dominated
-  by the term tlen * 3 * sizeof(long long) [=24*tlen] when the option -s
-  is specified, we compute the first 2^16-2^8 rules storing the input in an
-  array of shorts and using a quadratic algorithm (one a rule is found is 
-  applied with a complete scan on the input). This will hopefully significantly 
-  reduce the length of the working sequence so that the complete machinery
-  for the linear time algoritm fits in the available memory.
+  which used the following approach: since the working memory 
+  of the linear time algorithm is dominated by the term 
+     tlen * 3 * sizeof(long long) [=24*tlen]   until that size
+  fits in the available memory the algorithm uses a quadratic update 
+  (once a rule is found is applied with a complete scan on the input). 
 
 */
 
@@ -72,18 +70,18 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include "heap.h"
 
 // debug control
-int PRNC = 0;  // print current sequence C (verbose!)
-int PRNR = 0;  // print active pairs in the heap (verbose!)
-int PRNCf = 0; // print final sequence C
-int PRNP =  0;  // print forming pairs
-int PRNL =  0;  // print progress on text scan
-void prnSym(int c);
-void prnsC(unsigned short *, relong len);
+#define PRNC  (Verbose>3)  // print current sequence C (verbose!)
+#define PRNR  (Verbose>3)  // print active pairs in the heap (verbose!) 
+#define PRNCf (Verbose>2)  // print final sequence C
+#define PRNP  (Verbose>1)  // print forming pairs
+#define PRNL  (Verbose>1)  // print progress on text scan
+void prnSym(uint32_t c);
+void prnsC(uint32_t *, relong len);
 void prnC(void);
 void prnRec(void);
 static void quit(const char *s);
 static void *mymalloc(size_t size, int line, const char *file);
-static void *myrealloc(void *ptr, size_t size, int line, const char *file);
+void *myrealloc(void *ptr, size_t size, int line, const char *file);
 static void usage_and_exit(char *name);
 
 
@@ -96,7 +94,8 @@ relong *C; // compressed text, pero tiene -ptrs al mismo texto
 relong u; // |text| and later current |C| with gaps
 relong c; // real |C| (without gaps)
 
-int64_t alph; // alphabet size and first non terminal symbol (is written to .R file)
+int64_t alph; // alphabet size and first non terminal symbol 
+              // it is the first item written to the .R file as a uint32
 int64_t n;    // alph + |R| = next id for a non terminal symbol
 
 Tlist *L; // |L| = c; // next and previous entry in gapped |C|
@@ -107,12 +106,12 @@ Trarray Rec; // records
 
 
 // globals controlled by the input parameters
-static int32_t maxForbiddenChar; // do not generate rules involving chars <= this
-                                 // default is -1, which means. no restriction
-static int64_t maxRules;         // max number of rules to generate
-                                 // default MAX_INT64, i.e. no restriction
-static int32_t maxMB;            // available memory in MBs 
-                                 // default MAX_INT32, i.e. no restriction
+static int64_t maxForbiddenChar;  // do not generate rules involving chars <= this
+                                  // default is -1 which means no restriction
+static int64_t maxRules;          // max number of rules to generate
+                                  // default INT64_MAX, i.e. no restriction
+static int32_t maxMB;             // available memory in MBs 
+                                  // default INT32_MAX, i.e. no restriction
 static int Verbose;
 
 
@@ -121,13 +120,8 @@ static int Verbose;
 int forbidden_pair(relong left, relong right)
 {
   assert(left>=0 && right >=0);
-  if (maxForbiddenChar < 0)
-    return 0;
-  if (left <= maxForbiddenChar)
-    return 1;
-  if (right <= maxForbiddenChar)
-    return 1;
-  return 0;
+  return (maxForbiddenChar>=0) && 
+         ((left <= maxForbiddenChar) || (right <= maxForbiddenChar));
 }
 
 
@@ -142,13 +136,14 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
   Tpair pair;
   // compute largest input symbol: if expand==true we must 
   // also move the uint8 in the corresponding uint32 position
+  assert(len>0);
   alph = 0;
   if(expand) {
     uint8_t *text8 = (uint8_t *) text;
     for(i=len-1;i>=0;i--) {
-      uint32_t c = text8[i];
-      text[i]=c; 
-      if(c>alph) alpha =c;
+      uint32_t ctmp = text8[i];
+      text[i]=ctmp; 
+      if(ctmp>alph) alph =ctmp;
     }
   }
   else for (i = 0; i < len; i++) {
@@ -156,11 +151,11 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
       alph = text[i];
   }
   
-  // init n as first code usable for non terminal and 
+  // init n as first code usable for non terminals and 
   // save alphabet size to the R file
   n = ++alph;
-  uint32_t c = alph;
-  if (fwrite(&c, sizeof(uint32_t), 1, R) != 1)
+  uint32_t tmpc = alph;
+  if (fwrite(&tmpc, sizeof(uint32_t), 1, R) != 1)
     quit("Error writing alphabet size to .R file");
 
   // init hash and heap of pairs 
@@ -187,9 +182,6 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
   purgeHeap(&Heap); // remove pairs with freq==1
 }
 
-
-
-
 // prepare for the use the full machinery:
 //   copy text[] to C[], free text[] 
 //   init the prev/next array L[]
@@ -202,7 +194,7 @@ void prepare(uint32_t *text, relong len)
   C = mymalloc(u * sizeof(relong),__LINE__,__FILE__);
   assert(text!=NULL);
   for (i = 0; i < u; i++)
-    C[i] = text[i]; // copy from text array (repair0)
+    C[i] = text[i]; // copy from text array
   free(text); 
 
   // init prev/next list L
@@ -257,7 +249,7 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
   if (PRNC)
     prnsC(sC,len);
   while ((n-alph) < maxRules) {
-    if ((len / 1024 / 1024) * 3 * sizeof(relong) <= maxMB)
+    if ((len / 1024 / 1024) * 3 * sizeof(relong) < maxMB)
       return len;
     if (PRNR)
       prnRec();
@@ -271,7 +263,7 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
     right = orec->pair.right;
     // ofreq = orec->freq;
     if (PRNP) {
-      printf("Chosen pair %i = (", n);
+      printf("Chosen pair %lli = (", (long long) n);
       prnSym(orec->pair.left);
       printf(",");
       prnSym(orec->pair.right);
@@ -356,7 +348,7 @@ relong repair(FILE *R)
   relong cpos;
   Trecord *rec, *orec;
   Tpair pair;
-  if (PRNL)
+  if (Verbose>0)
     printf("--- final stage, n=%lli\n", c);
   if (PRNC)
     prnC();
@@ -364,6 +356,7 @@ relong repair(FILE *R)
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
+    // printf("oid: %d\n",oid);
     if (oid == -1)
       break; // the end!!
     orec = &Rec.records[oid];
@@ -371,7 +364,7 @@ relong repair(FILE *R)
     if (fwrite(&orec->pair, sizeof(Tpair), 1, R) != 1)
       quit("Error writing to .R file in repair()");
     if (PRNP) {
-      printf("Chosen pair %i = (", n);
+      printf("Chosen pair %lli = (", (long long) n);
       prnSym(orec->pair.left);
       printf(",");
       prnSym(orec->pair.right);
@@ -546,19 +539,21 @@ int main(int argc, char **argv)
     case 'm':
       maxMB=atoi(optarg);
       if(maxMB<0) {
-        fprintf(stderr,"-m option must be non negative\n");
-        exit(1);
+        fprintf(stderr,"-m option must be non negative\n"); exit(1);
       }
       break;
     case 'r':
       maxRules=atol(optarg);
+      if(maxRules<0) {
+        fprintf(stderr,"-r option must be non negative\n"); exit(1);
+      }
       break;
     case 'x':
-      maxForbiddenChar=atoi(optarg);
-      if(maxForbiddenChar<0 || maxForbiddenChar>255) {
-        fprintf(stderr,"-x option must be in [0-255]\n");
+      long maxfc =atol(optarg);
+      if(maxfc<0 || maxfc> UINT32_MAX) {
+        fprintf(stderr,"-x option must be between 0 and 2^32-1\n");
         exit(1);
-      }
+      } else maxForbiddenChar = maxfc;
       break;
     case '?':
       fprintf(stderr,"Unknown option: %c\n", optopt);
@@ -570,10 +565,6 @@ int main(int argc, char **argv)
     for(int i=0; i<argc; i++)
       fprintf(stderr," %s",argv[i]);
     fputs("\n",stderr);
-  }
-  if(maxRules<0) {
-    fprintf(stderr,"-r option must be > 0\n");
-    exit(1);
   }
 
   // virtually get rid of options from the command line
@@ -614,23 +605,16 @@ int main(int argc, char **argv)
   // ------------- stage 0  (init)
   init32(text32, true, len, Rf);
   // ------------- stage 1  (if necessary)
-  if ((len/1024/1024)*3*sizeof(relong)> maxMB) {
+  if ((len/1024/1024)*3*sizeof(relong)>= maxMB) {
     // work on the short version as much as possible 
     len = repair32q(text32, len, Rf);
-    if (PRNL) fprintf("---end of stage 1, size=%lld\n",len);
+    if (Verbose>0) fprintf(stderr,"--- end of stage 1, size=%lli\n",len);
     assert(len>0);
-    text16 = myrealloc(text16, len * sizeof(uint16_t),__LINE__,__FILE__);
-    prepare(NULL, text16, len); // text16 is freed here
   }
-  else {
-    // go directly from char to relong 
-    if (PRNL) printf("---skipping stage 1\n");
-    prepare(text8, NULL, len); // text8 is freed here
-  }
+  else if (Verbose>0) fprintf(stderr,"--- skipping stage 1\n");
 
-
-
-  // ------------ final stage
+  // --- final stage (linear time but using 24*len)
+  prepare(text32, len); // init C[] and L[], text32 is freed here
   repair(Rf);
   if (fclose(Rf) != 0) {
     fprintf(stderr, "Error: cannot close file %s\n", fname);
@@ -658,10 +642,10 @@ int main(int argc, char **argv)
     fprintf(stderr, "Error: cannot close file %s\n", fname);
     exit(1);
   }
-  if (PRNCf)
-    prnC();
+  if (PRNCf) prnC();
   // free what is possible
   free(C); free(L);  
+
 
   // ------------- report compression statistics
 
@@ -673,7 +657,7 @@ int main(int argc, char **argv)
   long est_size = (long)((2.0 * (n - alph) + ((n - alph) + c) * (float)blog(n - 1)) / 8) + 1;
   fprintf(stderr, "RePair succeeded\n");
   fprintf(stderr, "   Original chars: %lli\n", olen);
-  fprintf(stderr, "   Number of rules: %i\n", n - alph);
+  fprintf(stderr, "   Number of rules: %lli\n", (long long) (n - alph));
   fprintf(stderr, "   Final sequence length: %lli (integers)\n", c);
   fprintf(stderr, "   Estimated output size (bytes): %ld\n", est_size);
   fprintf(stderr, "   Estimated compression ratio: %0.2f%%\n", (100.0 * est_size) / olen);
@@ -684,17 +668,16 @@ int main(int argc, char **argv)
 
 
 // functions printing debug information 
-
-void prnSym(int c)
+void prnSym(uint32_t c)
 {
   if (c < alph)
     printf("%c", c);
   else
-    printf("%i", c);
+    printf("%u", c);
 }
 
 
-void prnsC(unsigned short *sC, relong len)
+void prnsC(uint32_t *sC, relong len)
 {
   relong i = 0;
   printf("C[1..%lli] = ", len);
@@ -712,7 +695,7 @@ void prnC(void)
   relong i = 0;
   printf("C[1..%lli] = ", c);
   while (i < u) {
-    prnSym((int)C[i]);
+    prnSym((uint32_t)C[i]);
     printf(" ");
     i++;
     if ((i < u) && (C[i] < 0))
@@ -765,7 +748,8 @@ static void *mymalloc(size_t size, int line, const char *file)
   return v;
 }
 
-static void *myrealloc(void *ptr, size_t size, int line, const char *file)
+// not used
+void *myrealloc(void *ptr, size_t size, int line, const char *file)
 {
   void *v=realloc(ptr,size);
   if(v==NULL) {
@@ -775,159 +759,3 @@ static void *myrealloc(void *ptr, size_t size, int line, const char *file)
   }
   return v;
 }
-
-
-
-
-
-
-
-// currently not used!!! 
-// it could be useful for a version using less than 4*len bytes  
-
-/* 
- *
-// init8: given the input as a uint8 sequence compute alphabet size 
-// and init Rec, Hash, and Heap
-void init8(uint8_t *text, relong len, FILE *R)
-{
-  relong i;
-  int id;
-  Tpair pair;
-  // compute largest input symbol
-  alph = 0;
-  for (i = 0; i < len; i++) {
-    if (text[i] > alph)
-      alph = text[i];
-  }
-  // init alphabet size and n as first code usable for non terminal and save it to file
-  n = ++alph;
-  if (fwrite(&alph, sizeof(int), 1, R) != 1)
-    quit("Error writing alphabet size to .R file");
-  // init hash and heap of pairs 
-  Rec = createRecords(factor, minsize);
-  Heap = createHeap(len, &Rec, factor, minsize);
-  Hash = createHash(256 * 256, &Rec);
-  assocRecords(&Rec, &Hash, &Heap, NULL);
-  // init all valid pairs
-  for (i = 0; i < len - 1; i++) {
-    pair.left = text[i];
-    pair.right = text[i + 1];
-    if(!forbidden_pair(pair.left,pair.right)) {
-      id = searchHash(Hash, pair);
-      if (id == -1) { // new pair, insert
-        id = insertRecord(&Rec, pair);
-      }
-      else {
-        incFreq(&Heap, id);
-      }
-      if (PRNL && (i % 1000000 == 0))
-        printf("Processed %lli chars\n", i);
-    }
-  }
-  purgeHeap(&Heap); // remove pairs with freq==1
-}
-
-
-
-
-relong repair16q(uint16_t *sC, relong len, FILE *R)
-{
-  int oid, id;
-  relong cpos, pos;
-  Trecord *orec;
-  Tpair pair;
-  int left, right;
-  if (PRNL)
-    printf("--- second stage, n=%lli\n", len);
-  if (PRNC)
-    prnsC(sC,len);
-  while (n < 1 << 16 && (n-alph) < maxRules) {
-    if ((len / 1024 / 1024) * 3 * sizeof(relong) <= maxMB)
-      return len;
-    if (PRNR)
-      prnRec();
-    oid = extractMax(&Heap);
-    if (oid == -1)
-      break; // the end!!
-    orec = &Rec.records[oid];
-    if (fwrite(&orec->pair, sizeof(Tpair), 1, R) != 1)
-      quit("Error writing to .R file in repair1()");
-    left = orec->pair.left;
-    right = orec->pair.right;
-    // ofreq = orec->freq;
-    if (PRNP) {
-      printf("Chosen pair %i = (", n);
-      prnSym(orec->pair.left);
-      printf(",");
-      prnSym(orec->pair.right);
-      printf(") (%lli occs)\n", orec->freq);
-    }
-    pos = 0;
-    for (cpos = 0; cpos < len - 1; cpos++) {
-      if ((sC[cpos] != left) || (sC[cpos + 1] != right))
-        sC[pos] = sC[cpos];
-      else { // occurrence of the pair to modify
-        // decr freqs of pairs that disappear
-        if (pos > 0) {
-          pair.left = sC[pos - 1];
-          pair.right = sC[cpos];
-          id = searchHash(Hash, pair);
-          if (id != -1) { // may not exist if purgeHeap'd
-            if (id != oid)
-              decFreq(&Heap, id); // not to my pair!
-          }
-        }
-        if (cpos < len - 2) {
-          pair.left = sC[cpos + 1];
-          pair.right = sC[cpos + 2];
-          id = searchHash(Hash, pair);
-          if (id != -1) { // may not exist if purgeHeap'd
-            if (id != oid)
-              decFreq(&Heap, id); // not to my pair!
-          }
-        }
-        // create or incr freqs of pairs that appear
-        if (pos > 0) {
-          pair.left = sC[pos - 1];
-          pair.right = n;
-          id = searchHash(Hash, pair);
-          if (id == -1) { // new pair, insert
-            id = insertRecord(&Rec, pair);
-          }
-          else {
-            incFreq(&Heap, id);
-          }
-        }
-        if (cpos < len - 2) {
-          pair.left = n;
-          pair.right = sC[cpos + 2];
-          id = searchHash(Hash, pair);
-          if (id == -1) { // new pair, insert
-            id = insertRecord(&Rec, pair);
-          }
-          else {
-            incFreq(&Heap, id);
-          }
-        }
-        // actually do the substitution
-        sC[pos] = n;
-        cpos++;
-      }
-      pos++;
-    }
-    if (cpos == len - 1)
-      sC[pos++] = sC[cpos];
-    len = pos;
-    if (PRNC)
-      prnsC(sC,len);
-    removeRecord(&Rec, oid);
-    n++;
-    purgeHeap(&Heap);                      // remove freq 1 from heap
-  }
-  purgeHeap(&Heap); // remove freq 1 from heap, if it exited for oid=-1
-  return len;
-}
-
-
-*/
