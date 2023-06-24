@@ -40,13 +40,13 @@ Theap createHeap (relong u, Trarray *Rec, float factor, int minsize)
     int i;
     H.sqrtu = 2;
     while ((relong)H.sqrtu * (relong)H.sqrtu < u) H.sqrtu++;
-    H.infreq = (void*)malloc(H.sqrtu * sizeof(Tarray));
+    H.infreq = mymalloc(H.sqrtu * sizeof(Tarray),__LINE__,__FILE__);
     for (i=1;i<H.sqrtu;i++) H.infreq[i] = createArray(Rec,factor,minsize);
-    H.freq = malloc (H.sqrtu * sizeof(Thnode));
+    H.freq = mymalloc (H.sqrtu * sizeof(Thnode),__LINE__,__FILE__);
     H.freef = 0;
     for (i=0;i<H.sqrtu-1;i++) H.freq[i].next = i+1;
     H.freq[H.sqrtu-1].next = -1;
-    H.ff = malloc (H.sqrtu * sizeof(Thfreq));
+    H.ff = mymalloc (H.sqrtu * sizeof(Thfreq),__LINE__,__FILE__);
     H.freeff = 0;
     for (i=0;i<H.sqrtu-1;i++) H.ff[i].larger = i+1;
     H.ff[H.sqrtu-1].larger = -1;

@@ -29,11 +29,15 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 typedef long long relong;
 
-void *myMalloc (relong n); // safe malloc/realloc
-void *myRealloc (void *p, relong n);
+void *mymalloc(size_t size, int line, const char *file);
+void *myrealloc(void *ptr, size_t size, int line, const char *file);
 
-#define malloc(n) myMalloc(n)
-#define realloc(p,n) myRealloc(p,n)
+//void *myMalloc (relong n); // safe malloc/realloc
+//void *myRealloc (void *p, relong n);
+//#define malloc(n) myMalloc(n)
+//#define realloc(p,n) myRealloc(p,n)
+
+
 
 typedef struct
   { int left,right;

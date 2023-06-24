@@ -79,8 +79,6 @@ static void prnsC(uint32_t *, relong len);
 static void prnC(void);
 static void prnRec(void);
 static void quit(const char *s);
-static void *mymalloc(size_t size, int line, const char *file);
-void *myrealloc(void *ptr, size_t size, int line, const char *file);
 static void usage_and_exit(char *name);
 
 // ugly globals
@@ -508,8 +506,8 @@ relong repair(FILE *R)
       }
       C[ni] = C[i];
       u = c;
-      C = realloc(C, c * sizeof(relong));
-      L = realloc(L, c * sizeof(Tlist));
+      C = myrealloc(C, c * sizeof(relong),__LINE__,__FILE__);
+      L = myrealloc(L, c * sizeof(Tlist),__LINE__,__FILE__);
       assocRecords(&Rec, &Hash, &Heap, L);
     }
   }
@@ -735,28 +733,4 @@ static void quit(const char *s)
   if(errno==0) fprintf(stderr,"%s\n",s);
   else  perror(s);
   exit(1);
-}
-
-// malloc and exit if out of memory
-static void *mymalloc(size_t size, int line, const char *file)
-{
-  void *v=malloc(size);
-  if(v==NULL) {
-    fprintf(stderr,"Out of memory allocating %zu bytes" 
-                 "at line %d of file %s\n",size,line,file);
-    exit(3);
-  }
-  return v;
-}
-
-// not used
-void *myrealloc(void *ptr, size_t size, int line, const char *file)
-{
-  void *v=realloc(ptr,size);
-  if(v==NULL) {
-    fprintf(stderr,"Out of memory allocating %zu bytes" 
-                 "at line %d of file %s\n",size,line,file);
-    exit(3);
-  }
-  return v;
 }

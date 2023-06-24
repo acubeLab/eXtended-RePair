@@ -24,12 +24,12 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 */
 
-	// linear probing hash table for pairs
+  // linear probing hash table for pairs
 
-	// table only grows to keep factor, does not shrink
-	// this is ok for this application where #pairs rarely decreases
+  // table only grows to keep factor, does not shrink
+  // this is ok for this application where #pairs rarely decreases
 
-	// value -1 denotes empty cells, -2 is a deletion mark
+  // value -1 denotes empty cells, -2 is a deletion mark
 
 #include <stdlib.h>
 #include "hash.h"
@@ -46,10 +46,10 @@ int searchHash (Thash H, Tpair p) // returns id
     int k = ((LPRIME*u) >> (8*sizeof(int))) & H.maxpos;
     Trecord *recs = H.Rec->records;
     while (H.table[k] != -1) 
-      {	if ((H.table[k] >= 0) && 
-	    (recs[H.table[k]].pair.left == p.left) &&
-	    (recs[H.table[k]].pair.right == p.right)) break;
-	k = (k+1) & H.maxpos;
+      { if ((H.table[k] >= 0) && 
+      (recs[H.table[k]].pair.left == p.left) &&
+      (recs[H.table[k]].pair.right == p.right)) break;
+  k = (k+1) & H.maxpos;
       }
     return H.table[k];
   }
@@ -62,25 +62,25 @@ void deleteHash (Thash *H, int id) // deletes H->Rec[id].pair from hash
   }
 
 Thash createHash (int maxpos, Trarray *Rec)
-				// creates new empty hash table
+        // creates new empty hash table
 
   { Thash H;
     int i;
-	// upgrade maxpos to the next value of the form (1<<smth)-1
+  // upgrade maxpos to the next value of the form (1<<smth)-1
     while (maxpos & (maxpos-1)) maxpos &= maxpos-1;
     maxpos = (maxpos-1)<<1 | 1;  // avoids overflow if maxpos = 1<<31
     H.maxpos = maxpos;
     H.used = 0;
-    H.table = (void*)malloc((1+maxpos)*sizeof(int));
+    H.table = mymalloc((1+maxpos)*sizeof(int),__LINE__,__FILE__);
     for (i=0;i<=maxpos;i++) H.table[i] = -1;
     H.Rec = Rec;
     return H;
   }
   
 static int finsertHash (Thash H, Tpair p) 
-			// inserts w/o resizing, assumes there is space
-			// does not update used field
-			// note can reuse marked deletions
+      // inserts w/o resizing, assumes there is space
+      // does not update used field
+      // note can reuse marked deletions
 
   { relong u = ((relong)p.left)<<(8*sizeof(int)) | (relong)p.right;
     int k = ((LPRIME*u) >> (8*sizeof(int))) & H.maxpos;
@@ -89,25 +89,25 @@ static int finsertHash (Thash H, Tpair p)
   }
 
 void insertHash (Thash *H, int id) // inserts H->Rec[id].pair in hash 
-				  // assumes key is not present
-				  // sets ptr from Rec to hash as well
+          // assumes key is not present
+          // sets ptr from Rec to hash as well
 
   { int k;
     Trecord *rec = H->Rec->records;
     if (H->used > H->maxpos * factor) // resize
-	{ Thash newH = createHash((H->maxpos<<1)|1,H->Rec);
-	  int i;
-	  int *tab = H->table;
-	  for (i=0;i<=H->maxpos;i++)
-	      if (tab[i] >= 0) // also removes marked deletions
-		 { k = finsertHash (newH,rec[tab[i]].pair);
-		   newH.table[k] = tab[i];
-		   rec[tab[i]].kpos = k;
-		 }
-	  newH.used = H->used;
-	  free (H->table);
-	  *H = newH;
-	}
+  { Thash newH = createHash((H->maxpos<<1)|1,H->Rec);
+    int i;
+    int *tab = H->table;
+    for (i=0;i<=H->maxpos;i++)
+        if (tab[i] >= 0) // also removes marked deletions
+     { k = finsertHash (newH,rec[tab[i]].pair);
+       newH.table[k] = tab[i];
+       rec[tab[i]].kpos = k;
+     }
+    newH.used = H->used;
+    free (H->table);
+    *H = newH;
+  }
     H->used++;
     k = finsertHash (*H,rec[id].pair);
     H->table[k] = id;

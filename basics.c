@@ -31,36 +31,60 @@ typedef long long relong;
 
 relong NullFreq = ((relong)1) << (8*sizeof(relong)-1);
 
-void *myMalloc (relong n)
 
-  { void *p;
-    if (n == 0) return NULL;
-    p = (void*)malloc(n);
-    if (p == NULL)
-       { fprintf(stderr,"Error: malloc failed\n");
-	 exit(1);
-       }
-    return p;
+// malloc and exit if out of memory
+void *mymalloc(size_t size, int line, const char *file)
+{
+  void *v=malloc(size);
+  if(v==NULL) {
+    fprintf(stderr,"Out of memory allocating %zu bytes" 
+                 "at line %d of file %s\n",size,line,file);
+    exit(3);
   }
+  return v;
+}
 
-void *myRealloc (void *p, relong n)
-
-  { if (n == 0) { free(p); return NULL; }
-    if (p == NULL) return myMalloc(n);
-    p = (void*)realloc(p,n);
-    if (p == NULL)
-       { fprintf(stderr,"Error: realloc failed\n");
-	 exit(1);
-       }
-    return p;
+void *myrealloc(void *ptr, size_t size, int line, const char *file)
+{
+  void *v=realloc(ptr,size);
+  if(v==NULL) {
+    fprintf(stderr,"Out of memory allocating %zu bytes" 
+                 "at line %d of file %s\n",size,line,file);
+    exit(3);
   }
+  return v;
+}
 
-int blog (int x)
 
-   { int l=0;
+//~ void *myMalloc (relong n)
+
+  //~ { void *p;
+    //~ if (n == 0) return NULL;
+    //~ p = (void*)malloc(n);
+    //~ if (p == NULL)
+       //~ { fprintf(stderr,"Error: malloc failed\n");
+   //~ exit(1);
+       //~ }
+    //~ return p;
+  //~ }
+
+//~ void *myRealloc (void *p, relong n)
+
+  //~ { if (n == 0) { free(p); return NULL; }
+    //~ if (p == NULL) return myMalloc(n);
+    //~ p = (void*)realloc(p,n);
+    //~ if (p == NULL)
+       //~ { fprintf(stderr,"Error: realloc failed\n");
+   //~ exit(1);
+       //~ }
+    //~ return p;
+  //~ }
+
+
+int blog (int x) { int l=0;
      while (x) { x>>=1; l++; }
      return l;
-   }
+}
 
 
 
