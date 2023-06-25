@@ -37,12 +37,12 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 extern float factor; // load factor
 
 
-#define LPRIME ((urelong)767865341467865341ull)
+#define LPRIME ((ureIdx)767865341467865341ull)
 #define PRIME 2013686449
 
 int searchHash (Thash H, Tpair p) // returns id 
 
-  { urelong u = ((urelong)p.left)<<(8*sizeof(int)) | (urelong)p.right;
+  { ureIdx u = ((ureIdx)p.left)<<(8*sizeof(int)) | (ureIdx)p.right;
     int k = ((LPRIME*u) >> (8*sizeof(int))) & H.maxpos;
     Trecord *recs = H.Rec->records;
     while (H.table[k] != -1) 
@@ -82,7 +82,7 @@ static int finsertHash (Thash H, Tpair p)
       // does not update used field
       // note can reuse marked deletions
 
-  { relong u = ((relong)p.left)<<(8*sizeof(int)) | (relong)p.right;
+  { reIdx u = ((reIdx)p.left)<<(8*sizeof(int)) | (reIdx)p.right;
     int k = ((LPRIME*u) >> (8*sizeof(int))) & H.maxpos;
     while (H.table[k] >= 0) k = (k+1) & H.maxpos;
     return k;

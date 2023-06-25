@@ -24,7 +24,7 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 */
 
-	// extendible array for records
+  // extendible array for records
 
 #ifndef RECORDSINCLUDED
 #define RECORDSINCLUDED
@@ -32,13 +32,13 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include "basics.h"
 
 typedef struct
-   { relong prev,next;
+   { reIdx prev,next;
    } Tlist; // list of prev next equal char
 
 typedef struct
    { Tpair pair; // pair content
-     relong freq; // frequency
-     relong cpos; // 1st position in C
+     reIdx freq; // frequency
+     reIdx cpos; // 1st position in C
      int hpos; // position in heap
      int kpos; // position in hash
    } Trecord;
@@ -60,15 +60,15 @@ typedef struct
 // contents can be accessed as Rec.records[0..Rec.size-1]
 
 int insertRecord (Trarray *Rec, Tpair pair); 
-			// inserts pair in Rec, returns id, links to/from
-			// Hash and Heap, not List. sets freq = 1
+      // inserts pair in Rec, returns id, links to/from
+      // Hash and Heap, not List. sets freq = 1
 
 void deleteRecord (Trarray *Rec); // deletes last cell in Rec
 
 Trarray createRecords (float factor, int minsize); // creates empty array
 
 void assocRecords (Trarray *Rec, void *Hash, void *Heap, void *List); 
-						// associates structures
+            // associates structures
 
 void destroyRecords (Trarray *Rec); // destroys Rec
   

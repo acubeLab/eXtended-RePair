@@ -24,11 +24,11 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 */
 
-	// binary heap with sqrt(u) heaps for least occurring ones
-	// and list of frequencies, each with a list of elems, for the others
-	// which are no more than sqrt(u) overall. this guarantees O(1) 
-	// operation times for the heap, as frequencies change by +-1, and
-	// O(sqrt(u)) integers overhead over the bare arrays of ids (/factor).
+  // binary heap with sqrt(u) heaps for least occurring ones
+  // and list of frequencies, each with a list of elems, for the others
+  // which are no more than sqrt(u) overall. this guarantees O(1) 
+  // operation times for the heap, as frequencies change by +-1, and
+  // O(sqrt(u)) integers overhead over the bare arrays of ids (/factor).
 
 #ifndef HEAPINCLUDED
 #define HEAPINCLUDED
@@ -39,7 +39,7 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include "records.h"
 
 typedef struct 
-  { relong freq;
+  { reIdx freq;
     int elems; // a pointer within freq array
     int larger,smaller; // pointers within ff array
   } Thfreq;
@@ -62,10 +62,10 @@ typedef struct
     Trarray *Rec; // records
   } Theap;
 
-Theap createHeap (relong u, Trarray *Rec, float factor, int minsize); 
-				// creates new empty heap
-				// 0<factor<1: occupancy factor
-				// sqrt(u)*max(minsize,n/factor) integers
+Theap createHeap (reIdx u, Trarray *Rec, float factor, int minsize); 
+        // creates new empty heap
+        // 0<factor<1: occupancy factor
+        // sqrt(u)*max(minsize,n/factor) integers
 
 void destroyHeap (Theap *H); // destroys H
 

@@ -57,18 +57,12 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
-#include <assert.h>
 #include <stdbool.h>
 
 #include "basics.h"
 #include "records.h"
 #include "hash.h"
 #include "heap.h"
-
-// do not even start if size of some types are not as expected
-static_assert (sizeof(size_t) >=8, "size_t type must be at least 64 bits");
-static_assert (sizeof(ssize_t) >=8, "ssize_t type must be at least 64 bits");
-static_assert (sizeof(relong)  > sizeof(uint32_t), "relong must be greater than resymb");
 
 
 // debug control
@@ -78,20 +72,23 @@ static_assert (sizeof(relong)  > sizeof(uint32_t), "relong must be greater than 
 #define PRNP  (Verbose>1)  // print forming pairs
 #define PRNL  (Verbose>1)  // print progress on text scan
 static void prnSym(uint32_t c);
-static void prnsC(uint32_t *, relong len);
+static void prnsC(uint32_t *, reIdx len);
 static void prnC(void);
 static void prnRec(void);
 static void usage_and_exit(char *name);
+void writeAlpha(size_t a, FILE *f, int line, char *file);
+void writeRule(Tpair p, FILE *f, int line, char *file);
+
 
 // ugly globals
 float factor = 0.75; // 1/extra space overhead; set closer to 1 for smaller
                      // and slower execution
 int minsize = 256;   // to avoid many reallocs at small sizes, should be ok as is
 
-relong *C; // compressed text, pero tiene -ptrs al mismo texto
+reIdx *C; // compressed text, pero tiene -ptrs al mismo texto
 
-static relong uLen; // |text| and later current |C| with gaps
-static relong cSize; // real |C| (without gaps)
+static reIdx uLen; // |text| and later current |C| with gaps
+static reIdx cSize; // real |C| (without gaps)
 
 ssize_t alph; // alphabet size and first non terminal symbol 
               // it is the first item written to the .R file as a uint32
@@ -114,40 +111,24 @@ static int32_t maxMB;             // available memory in MBs
 static int Verbose;
 
 
+
 // return true if forbidden chars are enabled 
 // and this pair of symbols should never appear
 // as the left-hand side of a rule
-int forbidden_pair(relong left, relong right)
+int forbidden_pair(reSym left, reSym right)
 {
-  assert(left>=0 && right >=0);
+  assert(left>=0 && right >=0); // useless as long as reSym is unsigned 
   return (maxForbiddenChar>=0) && 
          ((left <= maxForbiddenChar) || (right <= maxForbiddenChar));
-}
-
-// write (input) alphabet size to file (usually R) as an uint32_t 
-void writeAlpha(size_t a, FILE *f, int line, char *file) {
-  if(a<0 || a>UINT32_MAX) 
-    quit("Input alphabet negative or larger than 2^32-1",line,file);
-  uint32_t t = (uint32_t) a;
-  if(fwrite(&t,sizeof(t),1,f)!=1)
-    quit("Error writing alphabet size to file",line,file);
-}
-
-// write a rule (a pair of nonterminals) currently as a 
-// pair of uint32, maybe in the future using 5 bytes
-void writeRule(Tpair p, FILE *f, int line, char *file) {
-  static_assert(sizeof(p)==8,"Tpair should consist of two int32s");
-  if(fwrite(&p,sizeof(p),1,f)!=1)
-    quit("Error writing rule to file", line, file); 
 }
 
 
 // init32: given the input inside a uint32 sequence compute alphabet size 
 // and init Rec, Hash, and Heap. If expand==true the input is in
 // the first len bytes and must be expanded
-void init32(uint32_t *text, bool expand, relong len, FILE *R)
+void init32(reSym *text, bool expand, reIdx len, FILE *R)
 {
-  relong i;
+  reIdx i;
   int id;
   Tpair pair;
   // compute largest input symbol: if expand==true we must 
@@ -197,19 +178,16 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
 }
 
 
-
-
-
 // prepare for the use of the full machinery:
 //   copy text[] to C[], free text[] 
 //   init the prev/next array L[]
-void prepare(uint32_t *text, relong len)
+void prepare(uint32_t *text, reIdx len)
 {
-  relong i;
+  reIdx i;
   int id;
   Tpair pair;
   cSize = uLen = len;
-  C = mymalloc(uLen * sizeof(relong),__LINE__,__FILE__);
+  C = mymalloc(uLen * sizeof(reIdx),__LINE__,__FILE__);
   assert(text!=NULL);
   for (i = 0; i < uLen; i++)
     C[i] = text[i]; // copy from text array
@@ -255,10 +233,10 @@ void prepare(uint32_t *text, relong len)
 // uint32_t array and a quadratic update algorithm
 // called if -m option was used and until the the full 24*len structure
 // fits in the available memory
-relong repair32q(uint32_t *sC, relong len, FILE *R)
+reIdx repair32q(reSym *sC, reIdx len, FILE *R)
 {
   int oid, id;
-  relong cpos, pos;
+  reIdx cpos, pos;
   Trecord *orec;
   Tpair pair;
   int left, right;
@@ -266,8 +244,8 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
     prnsC(sC,len);
   // n is the id of the next rule, n-alpha the number of rules so far
   // stop if rule id becomes invalid or we reached the desired number of rules
-  while (n<=UINT32_MAX && (n-alph) < maxRules) {
-    if ((len / 1024 / 1024) * 3 * sizeof(relong) < maxMB)
+  while (n<=reSym_MAX && (n-alph) < maxRules) {
+    if ((len / 1024 / 1024) * 3 * sizeof(reIdx) < maxMB)
       return len;
     if (PRNR)
       prnRec();
@@ -275,10 +253,9 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
     if (oid == -1)
       break; // the end: no more pairs appearing more than once
     orec = &Rec.records[oid];
-    writeRule(orec->pair,R,__LINE__,__FILE__); // write rule anche check the result 
+    writeRule(orec->pair,R,__LINE__,__FILE__); // write rule to .R file 
     left = orec->pair.left;
     right = orec->pair.right;
-    // ofreq = orec->freq;
     if (PRNP) {
       printf("Chosen pair %zi = (", n);
       prnSym(orec->pair.left);
@@ -359,10 +336,10 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
 // (minus) a ptr to the next occ. idem previous cell to previous occ,
 // except that next ptr dominates over prev ptr if they must be in
 // the same cell. but in this case one can find prev in O(1) anyway.
-relong repair(FILE *R)
+reIdx repair(FILE *R)
 {
   int oid, id;
-  relong cpos;
+  reIdx cpos;
   Trecord *rec, *orec;
   Tpair pair;
   if (Verbose>0)
@@ -371,7 +348,7 @@ relong repair(FILE *R)
     prnC();
   // n is the id of the next rule, n-alpha the number of rules so far
   // stop if rule id becomes invalid or we reached the desired number of rules
-  while (n<=UINT32_MAX && (n-alph) < maxRules) {
+  while (n<=reSym_MAX && (n-alph) < maxRules) {
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
@@ -388,7 +365,7 @@ relong repair(FILE *R)
       printf(") (%zi occs)\n", orec->freq);
     }
     while (cpos != -1) {
-      relong ant, sgte, ssgte;
+      reIdx ant, sgte, ssgte;
       // replacing bc->e in abcd, b = cpos, c = sgte, d = ssgte
       if (C[cpos + 1] < 0)
         sgte = -C[cpos + 1] - 1;
@@ -404,6 +381,8 @@ relong repair(FILE *R)
       orec->cpos = L[cpos].next;
       if (ssgte != uLen) { // there is ssgte
         // remove occ of cd
+        assert(C[sgte]>=0 && C[sgte]<=reSym_MAX);
+        assert(C[ssgte]>=0 && C[ssgte]<=reSym_MAX);
         pair.left = C[sgte];
         pair.right = C[ssgte];
         id = searchHash(Hash, pair);
@@ -452,6 +431,8 @@ relong repair(FILE *R)
         }
         else
           ant = cpos - 1;
+        assert(C[ant]>=0 && C[ant]<=reSym_MAX);
+        assert(C[cpos]>=0 && C[cpos]<=reSym_MAX);
         pair.left = C[ant];
         pair.right = C[cpos];
         id = searchHash(Hash, pair);
@@ -505,7 +486,7 @@ relong repair(FILE *R)
     n++;
     purgeHeap(&Heap);   // remove freq 1 from heap
     if (cSize < factor * uLen) { // compact C
-      relong i, ni;
+      reIdx i, ni;
       i = 0;
       for (ni = 0; ni < cSize - 1; ni++) {
         C[ni] = C[i];
@@ -524,7 +505,7 @@ relong repair(FILE *R)
       }
       C[ni] = C[i];
       uLen = cSize;
-      C = myrealloc(C, cSize * sizeof(relong),__LINE__,__FILE__);
+      C = myrealloc(C, cSize * sizeof(reIdx),__LINE__,__FILE__);
       L = myrealloc(L, cSize * sizeof(Tlist),__LINE__,__FILE__);
       assocRecords(&Rec, &Hash, &Heap, L);
     }
@@ -539,7 +520,7 @@ int main(int argc, char **argv)
   extern int optind, opterr, optopt;
   char fname[PATH_MAX];
   FILE *Tf, *Rf, *Cf;
-  relong i, olen, len;
+  reIdx i, olen, len;
   struct stat s;
   int o;
 
@@ -568,7 +549,7 @@ int main(int argc, char **argv)
       break;
     case 'x': {
       long maxfc =atol(optarg);
-      if(maxfc<0 || maxfc> UINT32_MAX) {
+      if(maxfc<0 || maxfc> reSym_MAX) {
         fprintf(stderr,"-x option must be between 0 and 2^32-1\n");
         exit(1);
       } else maxForbiddenChar = maxfc;
@@ -603,7 +584,7 @@ int main(int argc, char **argv)
     exit(1);
   }
   // store input in an array of int32
-  uint32_t *text32 = mymalloc(len * sizeof(uint32_t),__LINE__,__FILE__);
+  reSym *text32 = mymalloc(len * sizeof(uint32_t),__LINE__,__FILE__);
   if (fread(text32, 1, len, Tf) != len) {
     fprintf(stderr, "Error: cannot read file %s\n", argv[1]);
     exit(1);
@@ -623,7 +604,7 @@ int main(int argc, char **argv)
   // ------------- stage 0  (init)
   init32(text32, true, len, Rf);
   // ------------- stage 1  (if necessary)
-  if ((len/1024/1024)*3*sizeof(relong)>= maxMB) {
+  if ((len/1024/1024)*3*sizeof(reIdx)>= maxMB) {
     // work on the short version as much as possible 
     len = repair32q(text32, len, Rf);
     if (Verbose>0) fprintf(stderr,"--- end of stage 1, size=%zi\n",len);
@@ -688,16 +669,16 @@ int main(int argc, char **argv)
 // functions printing debug information 
 static void prnSym(uint32_t c)
 {
-  if (c < alph)
+  if (c < 256)
     printf("%c", c);
   else
     printf("%u", c);
 }
 
 
-static void prnsC(uint32_t *sC, relong len)
+static void prnsC(uint32_t *sC, reIdx len)
 {
-  relong i = 0;
+  reIdx i = 0;
   printf("C[1..%zi] = ", len);
   while (i < len) {
     prnSym(sC[i]);
@@ -710,7 +691,7 @@ static void prnsC(uint32_t *sC, relong len)
 
 static void prnC(void)
 {
-  relong i = 0;
+  reIdx i = 0;
   printf("C[1..%zi] = ", cSize);
   while (i < uLen) {
     prnSym((uint32_t)C[i]);
@@ -735,6 +716,42 @@ static void prnRec(void)
   }
   printf("\n");
 }
+
+
+// --------- output functions
+
+// write (input) alphabet size (usually to R) as an uint32_t 
+// shall we change it if we use 5nytes per symbol? probably not...
+void writeAlpha(size_t a, FILE *f, int line, char *file) {
+  if(a<0 || a>UINT32_MAX) 
+    quit("Input alphabet negative or larger than 2^32-1",line,file);
+  uint32_t t = (uint32_t) a;
+  if(fwrite(&t,sizeof(t),1,f)!=1)
+    quit("Error writing alphabet size to file",line,file);
+}
+
+// write a rule (a pair of nonterminals) currently as a 
+// pair of uint32, maybe in the future using 5+5 bytes
+void writeRule(Tpair p, FILE *f, int line, char *file) {
+  // !!! to be changed if reSym changes 
+  static_assert(sizeof(p)==8,"Tpair should consist of two uint32s");
+  if(fwrite(&p,sizeof(p),1,f)!=1)
+    quit("Error writing rule to file", line, file); 
+}
+
+// write a single symbol (usually to the .C file) currently as a
+// uint32, maybe in the future using 5 bytes 
+void writeSymbol(reIdx s , FILE *f, int line, char *file) {
+  if(s<0 || s>reSym_MAX) 
+    quit("Symbol negative or larger than reSym_MAX",line,file);
+  // !!! to be changed if reSym changes   
+  static_assert(sizeof(reSym)==4,"reSym should consist of an uint32");
+  uint32_t t = (uint32_t) s;
+  if(fwrite(&t,sizeof(t),1,f)!=1)
+    quit("Error writing symbol to file", line, file); 
+}
+
+
 
 static void usage_and_exit(char *name)
 {

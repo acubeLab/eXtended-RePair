@@ -23,26 +23,44 @@ Author's contact: Gonzalo Navarro, Dept. of Computer Science, University of
 Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 */
-
 #ifndef BASICSINCLUDED
 #define BASICSINCLUDED
+#include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
+#include <assert.h>
 
-typedef ssize_t relong;
-typedef size_t urelong;
+// type used to represent an index in a sequence, size_t seems a safe choice
+typedef ssize_t reIdx;
+typedef size_t ureIdx;
+#define reIdx_MAX INT64_MAX // replacement fo SSIZE_MAX which is not defined
+// type used to represent a single symbol (terminal or non-terminal)
+// currently uint32 but we may later go to 5 byte symbols 
+typedef uint32_t reSym; 
+#define reSym_MAX UINT32_MAX
+// check type consistency: 
+static_assert (sizeof(reIdx) >=8, "reIdx type must be at least 64 bits");
+static_assert (sizeof(ureIdx) >=8, "ureIdx type must be at least 64 bits");
+static_assert (sizeof(reSym) >=4, "reSym type must be at least 32 bits");
+// reIdx is also used as a signed superset of reSym so we have extra constraints:
+// reIdx must be signed and contain values larger than reSym_MAX  
+static_assert (((reIdx) -1)  < 0, "reIdx must be a signed type");
+static_assert (reIdx_MAX  > reSym_MAX, "reIdx must strictly contain than reSym");
+
+
 
 void *mymalloc(size_t size, int line, const char *file);
 void *myrealloc(void *ptr, size_t size, int line, const char *file);
 void quit(const char *s, int, char *);
 
 typedef struct { 
-  uint32_t left,right;
+  reSym left,right;
 } Tpair;
 
-extern relong NullFreq;
+extern reIdx NullFreq;
 
 int blog (int x); // bits to represent x
 
