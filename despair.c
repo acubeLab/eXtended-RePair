@@ -31,10 +31,8 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "basics.h"
 
-typedef struct {
-  unsigned int left,right;
-} Tpair;
 
 long u; // |text| and later current |C| with gaps
 
@@ -44,7 +42,6 @@ unsigned int alph; // size of terminal alphabet, or smallest non terminal symbol
 Tpair *R; // rules
 
 size_t n; // |R|
-// int n; // |R|
 
 char *ff;
 FILE *f;
@@ -129,7 +126,7 @@ int main (int argc, char **argv)
   // n is the number of rules, sizeof(int) accounts for alpha
   n = (len-sizeof(int))/sizeof(Tpair);
   // allocate and read array of rules stored as pairs
-  R = (void*)malloc(n*sizeof(Tpair));
+  R = mymalloc(n*sizeof(Tpair),__LINE__,__FILE__);
   if (fread(R,sizeof(Tpair),n,Rf) != n) {
     fprintf (stderr,"Error: cannot read file %s\n",fname);
     exit(1);

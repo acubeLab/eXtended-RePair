@@ -68,6 +68,11 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include "hash.h"
 #include "heap.h"
 
+// do not even start if size of type are not as expected
+static_assert (sizeof(size_t) >=8, "size_t type must be at least 64 bits");
+static_assert (sizeof(ssize_t) >=8, "ssize_t type must be at least 64 bits");
+
+
 // debug control
 #define PRNC  (Verbose>3)  // print current sequence C (verbose!)
 #define PRNR  (Verbose>3)  // print active pairs in the heap (verbose!) 
@@ -88,8 +93,8 @@ int minsize = 256;   // to avoid many reallocs at small sizes, should be ok as i
 
 relong *C; // compressed text, pero tiene -ptrs al mismo texto
 
-relong u; // |text| and later current |C| with gaps
-relong c; // real |C| (without gaps)
+static relong uLen; // |text| and later current |C| with gaps
+static relong cSize; // real |C| (without gaps)
 
 int64_t alph; // alphabet size and first non terminal symbol 
               // it is the first item written to the .R file as a uint32
@@ -174,7 +179,7 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
         incFreq(&Heap, id);
       }
       if (PRNL && (i % 1000000 == 0))
-        printf("Processed %lli chars\n", i);
+        printf("Processed %zd chars\n", i);
     }
   }
   purgeHeap(&Heap); // remove pairs with freq==1
@@ -188,17 +193,17 @@ void prepare(uint32_t *text, relong len)
   relong i;
   int id;
   Tpair pair;
-  c = u = len;
-  C = mymalloc(u * sizeof(relong),__LINE__,__FILE__);
+  cSize = uLen = len;
+  C = mymalloc(uLen * sizeof(relong),__LINE__,__FILE__);
   assert(text!=NULL);
-  for (i = 0; i < u; i++)
+  for (i = 0; i < uLen; i++)
     C[i] = text[i]; // copy from text array
   free(text); 
 
   // init prev/next list L
-  L = mymalloc(u * sizeof(Tlist),__LINE__,__FILE__);
+  L = mymalloc(uLen * sizeof(Tlist),__LINE__,__FILE__);
   assocRecords(&Rec, &Hash, &Heap, L);
-  for (i = 0; i < c - 1; i++) {
+  for (i = 0; i < cSize - 1; i++) {
     pair.left = C[i];
     pair.right = C[i + 1];
     if(forbidden_pair(pair.left,pair.right)) {
@@ -223,7 +228,7 @@ void prepare(uint32_t *text, relong len)
       Rec.records[id].cpos = i;
     }
     if (PRNL && (i % 1000000 == 0))
-      printf("Processed %lli chars\n", i);
+      printf("Processed %zi chars\n", i);
   }
   L[i].prev = NullFreq;
   L[i].next = -1;
@@ -265,7 +270,7 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
       prnSym(orec->pair.left);
       printf(",");
       prnSym(orec->pair.right);
-      printf(") (%lli occs)\n", orec->freq);
+      printf(") (%zi occs)\n", orec->freq);
     }
     pos = 0;
     for (cpos = 0; cpos < len - 1; cpos++) {
@@ -347,7 +352,7 @@ relong repair(FILE *R)
   Trecord *rec, *orec;
   Tpair pair;
   if (Verbose>0)
-    printf("--- final stage, n=%lli\n", c);
+    printf("--- final stage, n=%zi\n", cSize);
   if (PRNC)
     prnC();
   // n is the id of the next rule, n-alpha the number of rules so far
@@ -363,11 +368,11 @@ relong repair(FILE *R)
     if (fwrite(&orec->pair, sizeof(Tpair), 1, R) != 1)
       quit("Error writing to .R file in repair()");
     if (PRNP) {
-      printf("Chosen pair %lli = (", (long long) n);
+      printf("Chosen pair %zi = (", n);
       prnSym(orec->pair.left);
       printf(",");
       prnSym(orec->pair.right);
-      printf(") (%lli occs)\n", orec->freq);
+      printf(") (%zi occs)\n", orec->freq);
     }
     while (cpos != -1) {
       relong ant, sgte, ssgte;
@@ -376,7 +381,7 @@ relong repair(FILE *R)
         sgte = -C[cpos + 1] - 1;
       else
         sgte = cpos + 1;
-      if ((sgte + 1 < u) && (C[sgte + 1] < 0))
+      if ((sgte + 1 < uLen) && (C[sgte + 1] < 0))
         ssgte = -C[sgte + 1] - 1;
       else
         ssgte = sgte + 1;
@@ -384,7 +389,7 @@ relong repair(FILE *R)
       if (L[cpos].next != -1)
         L[L[cpos].next].prev = -oid - 1;
       orec->cpos = L[cpos].next;
-      if (ssgte != u) { // there is ssgte
+      if (ssgte != uLen) { // there is ssgte
         // remove occ of cd
         pair.left = C[sgte];
         pair.right = C[ssgte];
@@ -474,10 +479,10 @@ relong repair(FILE *R)
         }
       }
       C[cpos] = n;
-      if (ssgte != u)
+      if (ssgte != uLen)
         C[ssgte - 1] = -cpos - 1;
       C[cpos + 1] = -ssgte - 1;
-      c--;
+      cSize--;
       orec = &Rec.records[oid]; // just in case of Rec.records realloc'd
       cpos = orec->cpos;
     }
@@ -486,10 +491,10 @@ relong repair(FILE *R)
     removeRecord(&Rec, oid);
     n++;
     purgeHeap(&Heap);   // remove freq 1 from heap
-    if (c < factor * u) { // compact C
+    if (cSize < factor * uLen) { // compact C
       relong i, ni;
       i = 0;
-      for (ni = 0; ni < c - 1; ni++) {
+      for (ni = 0; ni < cSize - 1; ni++) {
         C[ni] = C[i];
         L[ni] = L[i];
         if (L[ni].prev < 0) {
@@ -505,9 +510,9 @@ relong repair(FILE *R)
           i = -C[i] - 1;
       }
       C[ni] = C[i];
-      u = c;
-      C = myrealloc(C, c * sizeof(relong),__LINE__,__FILE__);
-      L = myrealloc(L, c * sizeof(Tlist),__LINE__,__FILE__);
+      uLen = cSize;
+      C = myrealloc(C, cSize * sizeof(relong),__LINE__,__FILE__);
+      L = myrealloc(L, cSize * sizeof(Tlist),__LINE__,__FILE__);
       assocRecords(&Rec, &Hash, &Heap, L);
     }
   }
@@ -523,6 +528,7 @@ int main(int argc, char **argv)
   FILE *Tf, *Rf, *Cf;
   relong i, olen, len;
   struct stat s;
+  int o;
 
   /* ----- -------- read options from command line ----------- */
   maxRules= INT64_MAX;
@@ -530,8 +536,8 @@ int main(int argc, char **argv)
   maxMB = INT32_MAX;
   Verbose=0;
   opterr = 0;
-  while ((c=getopt(argc, argv, "m:r:x:v")) != -1) {
-    switch (c) {
+  while ((o=getopt(argc, argv, "m:r:x:v")) != -1) {
+    switch (o) {
     case 'v':
       Verbose++;
       break;
@@ -607,7 +613,7 @@ int main(int argc, char **argv)
   if ((len/1024/1024)*3*sizeof(relong)>= maxMB) {
     // work on the short version as much as possible 
     len = repair32q(text32, len, Rf);
-    if (Verbose>0) fprintf(stderr,"--- end of stage 1, size=%lli\n",len);
+    if (Verbose>0) fprintf(stderr,"--- end of stage 1, size=%zi\n",len);
     assert(len>0);
   }
   else if (Verbose>0) fprintf(stderr,"--- skipping stage 1\n");
@@ -627,14 +633,14 @@ int main(int argc, char **argv)
     exit(1);
   }
   i = 0;
-  while (i < u) {
+  while (i < uLen) {
     int cc = (int)C[i];
     if (fwrite(&cc, sizeof(int), 1, Cf) != 1) {
       fprintf(stderr, "Error: cannot write file %s\n", fname);
       exit(1);
     }
     i++;
-    if ((i < u) && (C[i] < 0))
+    if ((i < uLen) && (C[i] < 0))
       i = -C[i] - 1;
   }
   if (fclose(Cf) != 0) {
@@ -653,11 +659,11 @@ int main(int argc, char **argv)
   // output size: 2.0*rules for the grammar tree shape
   //              rules+c*log(n-1) for the encoding of the tree leaves
   //                               and the sequence C
-  long est_size = (long)((2.0 * (n - alph) + ((n - alph) + c) * (float)blog(n - 1)) / 8) + 1;
+  long est_size = (long)((2.0 * (n - alph) + ((n - alph) + cSize) * (float)blog(n - 1)) / 8) + 1;
   fprintf(stderr, "RePair succeeded\n");
-  fprintf(stderr, "   Original chars: %lli\n", olen);
-  fprintf(stderr, "   Number of rules: %lli\n", (long long) (n - alph));
-  fprintf(stderr, "   Final sequence length: %lli (integers)\n", c);
+  fprintf(stderr, "   Original chars: %zi\n", olen);
+  fprintf(stderr, "   Number of rules: %zi\n",  (n - alph));
+  fprintf(stderr, "   Final sequence length: %zi (integers)\n", cSize);
   fprintf(stderr, "   Estimated output size (bytes): %ld\n", est_size);
   fprintf(stderr, "   Estimated compression ratio: %0.2f%%\n", (100.0 * est_size) / olen);
   // original estimate (4.0*(n-alph)+((n-alph)+c)*(float)blog(n-1))/(olen*8.0)*100.0);
@@ -679,7 +685,7 @@ static void prnSym(uint32_t c)
 static void prnsC(uint32_t *sC, relong len)
 {
   relong i = 0;
-  printf("C[1..%lli] = ", len);
+  printf("C[1..%zi] = ", len);
   while (i < len) {
     prnSym(sC[i]);
     printf(" ");
@@ -692,12 +698,12 @@ static void prnsC(uint32_t *sC, relong len)
 static void prnC(void)
 {
   relong i = 0;
-  printf("C[1..%lli] = ", c);
-  while (i < u) {
+  printf("C[1..%zi] = ", cSize);
+  while (i < uLen) {
     prnSym((uint32_t)C[i]);
     printf(" ");
     i++;
-    if ((i < u) && (C[i] < 0))
+    if ((i < uLen) && (C[i] < 0))
       i = -C[i] - 1;
   }
   printf("\n\n");
@@ -712,7 +718,7 @@ static void prnRec(void)
     prnSym(Rec.records[i].pair.left);
     printf(",");
     prnSym(Rec.records[i].pair.right);
-    printf("), %lli occs\n", Rec.records[i].freq);
+    printf("), %zi occs\n", Rec.records[i].freq);
   }
   printf("\n");
 }

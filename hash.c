@@ -36,8 +36,8 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 extern float factor; // load factor
 
-typedef unsigned long long urelong;
-#define LPRIME ((urelong)767865341467865341)
+
+#define LPRIME ((urelong)767865341467865341ull)
 #define PRIME 2013686449
 
 int searchHash (Thash H, Tpair p) // returns id 

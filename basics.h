@@ -26,16 +26,15 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 #ifndef BASICSINCLUDED
 #define BASICSINCLUDED
+#include <unistd.h>
 
-typedef long long relong;
+typedef ssize_t relong;
+typedef size_t urelong;
+
+
 
 void *mymalloc(size_t size, int line, const char *file);
 void *myrealloc(void *ptr, size_t size, int line, const char *file);
-
-//void *myMalloc (relong n); // safe malloc/realloc
-//void *myRealloc (void *p, relong n);
-//#define malloc(n) myMalloc(n)
-//#define realloc(p,n) myRealloc(p,n)
 
 
 
