@@ -58,10 +58,8 @@ size_t expand (unsigned int i, size_t d)
     d++;  // expansion on the right branch is replaced by iteration
   }
   c = i;
-  if (fwrite(&c,sizeof(char),1,f) != 1) {
-    fprintf (stderr,"Error: cannot write file %s\n",ff);
-    exit(1);
-  }
+  if (fwrite(&c,sizeof(char),1,f) != 1) 
+    quit("Cannot write to output file", __LINE__, __FILE__);
   if (d > maxdepth) maxdepth = d;// keep track of max depth
   return ret;
 }
@@ -93,8 +91,7 @@ int main (int argc, char **argv)
   if (argc != 2) {
     fprintf (stderr,"Usage: %s <filename>\n"
              "Decompresses <filename> from its .C and .R "
-             "extensions.\n Decompressed file is <filename>.out\n"
-             "This is a version for prefix-free parsing\n",argv[0]);
+             "extensions.\n Decompressed file is <filename>.out\n",argv[0]);
     exit(1);
   }
 

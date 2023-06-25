@@ -27,20 +27,20 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #ifndef BASICSINCLUDED
 #define BASICSINCLUDED
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <stdint.h>
 
 typedef ssize_t relong;
 typedef size_t urelong;
 
-
-
 void *mymalloc(size_t size, int line, const char *file);
 void *myrealloc(void *ptr, size_t size, int line, const char *file);
+void quit(const char *s, int, char *);
 
-
-
-typedef struct
-  { int left,right;
-  } Tpair;
+typedef struct { 
+  uint32_t left,right;
+} Tpair;
 
 extern relong NullFreq;
 

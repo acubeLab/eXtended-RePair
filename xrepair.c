@@ -53,14 +53,11 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #endif
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <limits.h>
 #include <assert.h>
-#include <errno.h>
 #include <stdbool.h>
 
 #include "basics.h"
@@ -68,9 +65,10 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include "hash.h"
 #include "heap.h"
 
-// do not even start if size of type are not as expected
+// do not even start if size of some types are not as expected
 static_assert (sizeof(size_t) >=8, "size_t type must be at least 64 bits");
 static_assert (sizeof(ssize_t) >=8, "ssize_t type must be at least 64 bits");
+static_assert (sizeof(relong)  > sizeof(uint32_t), "relong must be greater than resymb");
 
 
 // debug control
@@ -83,7 +81,6 @@ static void prnSym(uint32_t c);
 static void prnsC(uint32_t *, relong len);
 static void prnC(void);
 static void prnRec(void);
-static void quit(const char *s);
 static void usage_and_exit(char *name);
 
 // ugly globals
@@ -96,14 +93,14 @@ relong *C; // compressed text, pero tiene -ptrs al mismo texto
 static relong uLen; // |text| and later current |C| with gaps
 static relong cSize; // real |C| (without gaps)
 
-int64_t alph; // alphabet size and first non terminal symbol 
+ssize_t alph; // alphabet size and first non terminal symbol 
               // it is the first item written to the .R file as a uint32
-int64_t n;    // alph + |R| = next id for a non terminal symbol
+ssize_t n;    // alph + |R| = next id for a non terminal symbol
 
 Tlist *L; // |L| = c; // next and previous entry in gapped |C|
 
-Thash Hash; // hash table of pairs
-Theap Heap; // special heap of pairs
+Thash Hash;  // hash table of pairs
+Theap Heap;  // special heap of pairs
 Trarray Rec; // records
 
 
@@ -127,6 +124,22 @@ int forbidden_pair(relong left, relong right)
          ((left <= maxForbiddenChar) || (right <= maxForbiddenChar));
 }
 
+// write (input) alphabet size to file (usually R) as an uint32_t 
+void writeAlpha(size_t a, FILE *f, int line, char *file) {
+  if(a<0 || a>UINT32_MAX) 
+    quit("Input alphabet negative or larger than 2^32-1",line,file);
+  uint32_t t = (uint32_t) a;
+  if(fwrite(&t,sizeof(t),1,f)!=1)
+    quit("Error writing alphabet size to file",line,file);
+}
+
+// write a rule (a pair of nonterminals) currently as a 
+// pair of uint32, maybe in the future using 5 bytes
+void writeRule(Tpair p, FILE *f, int line, char *file) {
+  static_assert(sizeof(p)==8,"Tpair should consist of two int32s");
+  if(fwrite(&p,sizeof(p),1,f)!=1)
+    quit("Error writing rule to file", line, file); 
+}
 
 
 // init32: given the input inside a uint32 sequence compute alphabet size 
@@ -157,9 +170,7 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
   // init n as first code usable for non terminals and 
   // save alphabet size to the R file
   n = ++alph;
-  uint32_t tmpc = alph;
-  if (fwrite(&tmpc, sizeof(uint32_t), 1, R) != 1)
-    quit("Error writing alphabet size to .R file");
+  writeAlpha(alph,R,__LINE__,__FILE__);
 
   // init hash and heap of pairs 
   Rec = createRecords(factor, minsize);
@@ -184,6 +195,10 @@ void init32(uint32_t *text, bool expand, relong len, FILE *R)
   }
   purgeHeap(&Heap); // remove pairs with freq==1
 }
+
+
+
+
 
 // prepare for the use of the full machinery:
 //   copy text[] to C[], free text[] 
@@ -260,13 +275,12 @@ relong repair32q(uint32_t *sC, relong len, FILE *R)
     if (oid == -1)
       break; // the end: no more pairs appearing more than once
     orec = &Rec.records[oid];
-    if (fwrite(&orec->pair, sizeof(Tpair), 1, R) != 1)
-      quit("Error writing to .R file in repair32q()");
+    writeRule(orec->pair,R,__LINE__,__FILE__); // write rule anche check the result 
     left = orec->pair.left;
     right = orec->pair.right;
     // ofreq = orec->freq;
     if (PRNP) {
-      printf("Chosen pair %lli = (", (long long) n);
+      printf("Chosen pair %zi = (", n);
       prnSym(orec->pair.left);
       printf(",");
       prnSym(orec->pair.right);
@@ -365,8 +379,7 @@ relong repair(FILE *R)
       break; // the end!!
     orec = &Rec.records[oid];
     cpos = orec->cpos;
-    if (fwrite(&orec->pair, sizeof(Tpair), 1, R) != 1)
-      quit("Error writing to .R file in repair()");
+    writeRule(orec->pair,R,__LINE__,__FILE__);
     if (PRNP) {
       printf("Chosen pair %zi = (", n);
       prnSym(orec->pair.left);
@@ -730,13 +743,5 @@ static void usage_and_exit(char *name)
   fprintf(stderr,"\t\t-m maxMB       max memory to use in MB (def. no limit)\n");
   fprintf(stderr,"\t\t-r num         max number of rules (def. no limit)\n");
   fprintf(stderr,"\t\t-x mul         largest char ignored by rules (def. none)\n\n");
-  exit(1);
-}
-
-// write error message and exit
-static void quit(const char *s)
-{
-  if(errno==0) fprintf(stderr,"%s\n",s);
-  else  perror(s);
   exit(1);
 }

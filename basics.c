@@ -24,10 +24,8 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 */
 
-#include <stdlib.h>
-#include <stdio.h>
+#include "basics.h"
 
-typedef long long relong;
 
 relong NullFreq = ((relong)1) << (8*sizeof(relong)-1);
 
@@ -55,36 +53,21 @@ void *myrealloc(void *ptr, size_t size, int line, const char *file)
   return v;
 }
 
-
-//~ void *myMalloc (relong n)
-
-  //~ { void *p;
-    //~ if (n == 0) return NULL;
-    //~ p = (void*)malloc(n);
-    //~ if (p == NULL)
-       //~ { fprintf(stderr,"Error: malloc failed\n");
-   //~ exit(1);
-       //~ }
-    //~ return p;
-  //~ }
-
-//~ void *myRealloc (void *p, relong n)
-
-  //~ { if (n == 0) { free(p); return NULL; }
-    //~ if (p == NULL) return myMalloc(n);
-    //~ p = (void*)realloc(p,n);
-    //~ if (p == NULL)
-       //~ { fprintf(stderr,"Error: realloc failed\n");
-   //~ exit(1);
-       //~ }
-    //~ return p;
-  //~ }
-
-
 int blog (int x) { int l=0;
      while (x) { x>>=1; l++; }
      return l;
 }
+
+// write error message and exit
+void quit(const char *msg, int line, char *file) {
+  if(errno==0)  fprintf(stderr,"== %d == %s\n",getpid(), msg);
+  else fprintf(stderr,"== %d == %s: %s\n",getpid(), msg,
+               strerror(errno));
+  fprintf(stderr,"== %d == Line: %d, File: %s\n",getpid(),line,file);
+
+  exit(1);
+}
+
 
 
 
