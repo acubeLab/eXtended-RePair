@@ -1,4 +1,4 @@
-/* repairX.c
+/* xrepair.c
    Giovanni Manzini    June 20st, 2023
 
   Implementation of repair algorithm for characters with bounded memory
@@ -59,6 +59,8 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include <limits.h>
 #include <stdbool.h>
 
+
+// type definitions anche checks for type consistency are in basics.h
 #include "basics.h"
 #include "records.h"
 #include "hash.h"
@@ -75,26 +77,27 @@ static void prnSym(uint32_t c);
 static void prnsC(uint32_t *, reIdx len);
 static void prnC(void);
 static void prnRec(void);
-static void usage_and_exit(char *name);
-void writeAlpha(size_t a, FILE *f, int line, char *file);
+static void usage_and_exit(const char *name);
+void writeAlpha(reIdx a, FILE *f, int line, char *file);
 void writeRule(Tpair p, FILE *f, int line, char *file);
+void writeSymbol(reIdx s , FILE *f, int line, char *file);
 
 
 // ugly globals
 float factor = 0.75; // 1/extra space overhead; set closer to 1 for smaller
                      // and slower execution
-int minsize = 256;   // to avoid many reallocs at small sizes, should be ok as is
+static int minsize = 256;   // to avoid many reallocs at small sizes, should be ok as is
 
-reIdx *C; // compressed text, pero tiene -ptrs al mismo texto
-
-static reIdx uLen; // |text| and later current |C| with gaps
+static reIdx *C;    // compressed text, pero tiene -ptrs al mismo texto
+static reIdx uLen;  // |text| and later current |C| with gaps
 static reIdx cSize; // real |C| (without gaps)
 
-ssize_t alph; // alphabet size and first non terminal symbol 
-              // it is the first item written to the .R file as a uint32
-ssize_t n;    // alph + |R| = next id for a non terminal symbol
+static reIdx alph; // alphabet size and first non terminal symbol 
+                   // it is the first item written to the .R file as a uint32
+static reIdx n;    // alph + |R| = next id for a non terminal symbol
 
-Tlist *L; // |L| = c; // next and previous entry in gapped |C|
+
+static Tlist *L; // |L| = c; // next and previous entry in gapped |C|
 
 Thash Hash;  // hash table of pairs
 Theap Heap;  // special heap of pairs
@@ -126,7 +129,7 @@ int forbidden_pair(reSym left, reSym right)
 // init32: given the input inside a uint32 sequence compute alphabet size 
 // and init Rec, Hash, and Heap. If expand==true the input is in
 // the first len bytes and must be expanded
-void init32(reSym *text, bool expand, reIdx len, FILE *R)
+void init32(uint32_t *text, bool expand, reIdx len, FILE *R)
 {
   reIdx i;
   int id;
@@ -233,7 +236,7 @@ void prepare(uint32_t *text, reIdx len)
 // uint32_t array and a quadratic update algorithm
 // called if -m option was used and until the the full 24*len structure
 // fits in the available memory
-reIdx repair32q(reSym *sC, reIdx len, FILE *R)
+reIdx repair32q(uint32_t *sC, reIdx len, FILE *R)
 {
   int oid, id;
   reIdx cpos, pos;
@@ -244,9 +247,9 @@ reIdx repair32q(reSym *sC, reIdx len, FILE *R)
     prnsC(sC,len);
   // n is the id of the next rule, n-alpha the number of rules so far
   // stop if rule id becomes invalid or we reached the desired number of rules
-  while (n<=reSym_MAX && (n-alph) < maxRules) {
+  while (n<=reSym_MAX && n <= UINT32_MAX && (n-alph) < maxRules) {
     if ((len / 1024 / 1024) * 3 * sizeof(reIdx) < maxMB)
-      return len;
+      return len; // text is small enough we can switch to the linear updte algorithm 
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
@@ -583,8 +586,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "Error: cannot open file %s for reading\n", argv[1]);
     exit(1);
   }
-  // store input in an array of int32
-  reSym *text32 = mymalloc(len * sizeof(uint32_t),__LINE__,__FILE__);
+  // store input in an array of uint32
+  uint32_t *text32 = mymalloc(len * sizeof(uint32_t),__LINE__,__FILE__);
   if (fread(text32, 1, len, Tf) != len) {
     fprintf(stderr, "Error: cannot read file %s\n", argv[1]);
     exit(1);
@@ -619,6 +622,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "Error: cannot close file %s\n", fname);
     exit(1);
   }
+  // ---- create .C file
   strcpy(fname, argv[1]);
   strcat(fname, ".C");
   Cf = fopen(fname, "w");
@@ -628,11 +632,7 @@ int main(int argc, char **argv)
   }
   i = 0;
   while (i < uLen) {
-    int cc = (int)C[i];
-    if (fwrite(&cc, sizeof(int), 1, Cf) != 1) {
-      fprintf(stderr, "Error: cannot write file %s\n", fname);
-      exit(1);
-    }
+    writeSymbol(C[i],Cf,__LINE__,__FILE__);
     i++;
     if ((i < uLen) && (C[i] < 0))
       i = -C[i] - 1;
@@ -721,9 +721,10 @@ static void prnRec(void)
 // --------- output functions
 
 // write (input) alphabet size (usually to R) as an uint32_t 
-// shall we change it if we use 5nytes per symbol? probably not...
-void writeAlpha(size_t a, FILE *f, int line, char *file) {
-  if(a<0 || a>UINT32_MAX) 
+// shall we change it if we use 5n bytes per symbol/non-terminal? 
+// probably not: input symbol will probably continue to be uint32 
+void writeAlpha(reIdx a, FILE *f, int line, char *file) {
+  if(a<0 || a>UINT32_MAX || a>reSym_MAX) 
     quit("Input alphabet negative or larger than 2^32-1",line,file);
   uint32_t t = (uint32_t) a;
   if(fwrite(&t,sizeof(t),1,f)!=1)
@@ -739,7 +740,7 @@ void writeRule(Tpair p, FILE *f, int line, char *file) {
     quit("Error writing rule to file", line, file); 
 }
 
-// write a single symbol (usually to the .C file) currently as a
+// write a single symbol/non-terminal (usually to the .C file) currently as a
 // uint32, maybe in the future using 5 bytes 
 void writeSymbol(reIdx s , FILE *f, int line, char *file) {
   if(s<0 || s>reSym_MAX) 
@@ -753,9 +754,11 @@ void writeSymbol(reIdx s , FILE *f, int line, char *file) {
 
 
 
-static void usage_and_exit(char *name)
+static void usage_and_exit(const char *name)
 {
-  fprintf(stderr,"Usage:\n\t  %s [options] infile\n",name);
+  fprintf(stderr,"Usage:\n\t  %s [options] infile\n\n",name);
+  fprintf(stderr,"\tRepair grammar compression algorithm\n");
+  fprintf(stderr,"\tRead infile and compress it to infile.C and infile.R\n\n");
   fprintf(stderr,"\t\t-v             verbose\n");
   fprintf(stderr,"\t\t-m maxMB       max memory to use in MB (def. no limit)\n");
   fprintf(stderr,"\t\t-r num         max number of rules (def. no limit)\n");
