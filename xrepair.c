@@ -59,7 +59,6 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include <limits.h>
 #include <stdbool.h>
 
-
 // type definitions anche checks for type consistency are in basics.h
 #include "basics.h"
 #include "records.h"

@@ -32,14 +32,14 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 static int PRNH = 0;
 
-Theap createHeap (relong u, Trarray *Rec, float factor, int minsize) 
+Theap createHeap (reIdx u, Trarray *Rec, float factor, int minsize) 
         // creates new empty heap
         // minsize, factor: space/time tradeoffs
 
   { Theap H;
     int i;
     H.sqrtu = 2;
-    while ((relong)H.sqrtu * (relong)H.sqrtu < u) H.sqrtu++;
+    while ((reIdx)H.sqrtu * (reIdx)H.sqrtu < u) H.sqrtu++;
     H.infreq = mymalloc(H.sqrtu * sizeof(Tarray),__LINE__,__FILE__);
     for (i=1;i<H.sqrtu;i++) H.infreq[i] = createArray(Rec,factor,minsize);
     H.freq = mymalloc (H.sqrtu * sizeof(Thnode),__LINE__,__FILE__);
@@ -79,14 +79,14 @@ void prnH (Theap *H)
 
   { Thfreq *f;
     static int X = 0;
-    relong prevf = (((relong)1)<<(8*sizeof(relong)-2))-1;
+    reIdx prevf = (((reIdx)1)<<(8*sizeof(reIdx)-2))-1;
     int fp = H->largest;
     if (fp == -1) return;
     X++;
     printf ("Heap %i = \n",X);
     while (fp != -1)
        { f = &H->ff[fp];
-         printf ("freq=%lli, elems=%i\n",f->freq,f->elems);
+         printf ("freq=%zi, elems=%i\n",f->freq,f->elems);
    if (prevf <= f->freq)
       { fp++; }
    prevf = f->freq;
@@ -97,7 +97,7 @@ void prnH (Theap *H)
 void incFreq (Theap *H, int id) // inc freq of pair Rec[id]
 
   { Trecord *rec = H->Rec->records;
-    relong freq = rec[id].freq++;
+    reIdx freq = rec[id].freq++;
     int hpos = rec[id].hpos;
     Thnode *p;
     Thfreq *f,*lf;
@@ -193,7 +193,7 @@ if (PRNH) prnH(H);
 void decFreq (Theap *H, int id) // dec freq of pair Rec[id]
 
   { Trecord *rec = H->Rec->records;
-    relong freq = rec[id].freq--;
+    reIdx freq = rec[id].freq--;
     int hpos = rec[id].hpos;
     Thnode *p;
     Thfreq *f,*sf;

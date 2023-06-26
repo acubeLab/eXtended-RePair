@@ -26,8 +26,8 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 #include "basics.h"
 
-
-relong NullFreq = ((relong)1) << (8*sizeof(relong)-1);
+// invalid index
+reIdx NullFreq = ((reIdx)1) << (8*sizeof(reIdx)-1);
 
 
 // malloc and exit if out of memory
@@ -53,7 +53,7 @@ void *myrealloc(void *ptr, size_t size, int line, const char *file)
   return v;
 }
 
-int blog (int x) { int l=0;
+int blog (reIdx x) { int l=0;
      while (x) { x>>=1; l++; }
      return l;
 }

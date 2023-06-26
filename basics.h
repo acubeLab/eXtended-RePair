@@ -25,10 +25,11 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 */
 #ifndef BASICSINCLUDED
 #define BASICSINCLUDED
-#include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
 #include <assert.h>
@@ -52,17 +53,16 @@ static_assert (reSym_MAX >=UINT32_MAX, "reSym type must be at least 32 bits");
 static_assert (((reIdx) -1)  < 0, "reIdx must be a signed type");
 static_assert (reIdx_MAX  > reSym_MAX, "reIdx must strictly contain than reSym");
 
-
-void *mymalloc(size_t size, int line, const char *file);
-void *myrealloc(void *ptr, size_t size, int line, const char *file);
-void quit(const char *s, int, char *);
-
 typedef struct { 
   reSym left,right;
 } Tpair;
 
 extern reIdx NullFreq;
 
-int blog (int x); // bits to represent x
+// proptopyes used for compression and decompression
+void *mymalloc(size_t size, int line, const char *file);
+void *myrealloc(void *ptr, size_t size, int line, const char *file);
+void quit(const char *s, int, char *);
+int blog (reIdx x); // bits to represent x
 
 #endif

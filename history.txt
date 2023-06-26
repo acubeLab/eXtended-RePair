@@ -10,10 +10,19 @@ Indexes with the input sequence are int64. prev/next fields in L are int64. Sinc
 
 uint8 input but easy to adapt to uint32 inputs
 Input is always loaded into a uint32 sequence (so space 4n is required)
-Uses the qudratic update algorithm until the full machinery for linear time 
+Uses the quadratic update algorithm until the full machinery for linear time 
 update fits into maxMB.
-Still have to check everything works when we have more than 2^31 symbols
-(some variables storing symbols are int, so the sign could be a problem)
+
+Defined type reSym (currenty uint32_t) to store terminala and non terminals
+Renamed type relong and urelong to reIdx and ureIdx (currently ssize_t and size_t) 
+to represent an index in a sequence.
+
+Should work with a total of 2^32 symbols: after that it currently stops 
+extending the grammar, but the output should be consisten
+
+Easy to add a -i switch to both compressor and decompressor to support input alphabets of 
+size up to 2^32
+
 
 
 

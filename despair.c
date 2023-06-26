@@ -68,18 +68,7 @@ reIdx expand (reIdx i, size_t d)
   return ret;
 }
 
-static int bits (size_t x)
-{
-  int l=0;
-  while (x) {
-    x>>=1;
-    l++;
-  }
-  return l;
-}
-
 int main (int argc, char **argv)
-
 {
   extern char *optarg;
   extern int optind, opterr, optopt;
@@ -116,16 +105,6 @@ int main (int argc, char **argv)
   argv += optind;
   argc -= optind;
   
-  
-  
-  if (argc != 2) {
-    fprintf (stderr,"Usage: %s <filename>\n"
-             "Decompresses <filename> from its .C and .R "
-             "extensions.\n Decompressed file is <filename>.out\n",argv[0]);
-    exit(1);
-  }
-
-
   // read .R file, store data in alph and R[]
   strcpy(fname,argv[1]);
   strcat(fname,".R");
@@ -206,7 +185,7 @@ int main (int argc, char **argv)
     quit("Cannot close output file",__LINE__,__FILE__);
 
   // here n is the number of rules, n+alpha the effective alphabet in C
-  long est_size = (long) ( (2.0*n+(n+c)*(double)bits(n+256))/8) + 1;
+  long est_size = (long) ( (2.0*n+(n+c)*(double)blog(n+256))/8) + 1;
   fprintf (stderr,"DesPair succeeded\n");
   fprintf (stderr,"   Original chars: %ld\n",u);
   fprintf (stderr,"   Number of rules: %ld\n",n);
