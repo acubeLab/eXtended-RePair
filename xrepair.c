@@ -650,7 +650,7 @@ int main(int argc, char **argv)
   // n is the highest numbered symbol, since each rule introduces a new symbol
   // starting with alph, n-alph is the number of rules.
   // output size: 2.0*rules for the grammar tree shape
-  //              rules+c*log(n-1) for the encoding of the tree leaves
+  //              (rules+c)*log(n-1) for the encoding of the tree leaves
   //                               and the sequence C
   long est_size = (long)((2.0 * (n - alph) + ((n - alph) + cSize) * (float)blog(n - 1)) / 8) + 1;
   fprintf(stderr, "RePair succeeded\n");

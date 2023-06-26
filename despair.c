@@ -185,7 +185,10 @@ int main (int argc, char **argv)
     quit("Cannot close output file",__LINE__,__FILE__);
 
   // here n is the number of rules, n+alpha the effective alphabet in C
-  long est_size = (long) ( (2.0*n+(n+c)*(double)blog(n+256))/8) + 1;
+  // output size: 2.0*rules for the grammar tree shape
+  //              (rules+c)*log(n+alpha) for the encoding of the tree leaves
+  //                                     and the sequence C
+  long est_size = (long) ( (2.0*n+(n+c)*(double)blog(n+alph))/8) + 1;
   fprintf (stderr,"DesPair succeeded\n");
   fprintf (stderr,"   Original chars: %ld\n",u);
   fprintf (stderr,"   Number of rules: %ld\n",n);
