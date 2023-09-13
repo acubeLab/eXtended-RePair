@@ -54,3 +54,5 @@ dkms.conf
 # compressed file
 *.R
 *.C
+# my executables
+*.x

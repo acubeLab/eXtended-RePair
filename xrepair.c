@@ -1,9 +1,9 @@
 /* xrepair.c
    Giovanni Manzini    June 20st, 2023
 
-  Implementation of repair algorithm for characters with bounded memory
+  Implementation of repair algorithm for uint8 inputs with bounded memory
   by Gonzalo Navarro with the following additional options:
-    -x C    [do not generate rules involving chars <= C]
+    -x C    [do not generate rules involving symbols <= C]
     -r R    [do not generate more than R rules]
     -m M    [use a quadratic algorithm until the full linear time
              machinery fits in M MBs ]
@@ -15,11 +15,16 @@
   the affect the output.
 
   This code is derived by the large and balanced repair implementation,
-  which used the following approach: since the working memory 
+  by Gonzalo which uses the following approach: since the working memory 
   of the linear time algorithm is dominated by the term 
      tlen * 3 * sizeof(long long) [=24*tlen]   
-  until that size fits in the available memory we use a quadratic update 
-  (once a rule is found it is applied with a complete scan on the input). 
+  until that size fits in the available memory we use a quadratic update
+  algorithm: when the next rule is found it is applied with a complete scan 
+  of the current sequence.
+
+  The algorithm is balanced since according to Gonzalo "it makes it very 
+  unlikely to generate very deep rules. (Haven't tried to prove anything). 
+  Trick: enqueueing instead of stacking rules in infreq arrays"
 */
 
 /*
@@ -248,7 +253,7 @@ reIdx repair32q(uint32_t *sC, reIdx len, FILE *R)
   // stop if rule id becomes invalid or we reached the desired number of rules
   while (n<=reSym_MAX && n <= UINT32_MAX && (n-alph) < maxRules) {
     if ((len / 1024 / 1024) * 3 * sizeof(reIdx) < maxMB)
-      return len; // text is small enough we can switch to the linear updte algorithm 
+      return len; // text is small enough we can switch to the linear update algorithm 
     if (PRNR)
       prnRec();
     oid = extractMax(&Heap);
