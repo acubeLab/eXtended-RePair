@@ -3,7 +3,7 @@
 
   Implementation of repair algorithm for uint8 inputs with bounded memory
   by Gonzalo Navarro with the following additional options:
-    -x C    [do not generate rules involving symbols <= C]
+    -x X    [do not generate rules involving symbols <= X]
     -r R    [do not generate more than R rules]
     -m M    [use a quadratic algorithm until the full linear time
              machinery fits in M MBs ]
@@ -766,6 +766,6 @@ static void usage_and_exit(const char *name)
   fprintf(stderr,"\t\t-v             verbose\n");
   fprintf(stderr,"\t\t-m maxMB       max memory to use in MB (def. no limit)\n");
   fprintf(stderr,"\t\t-r num         max number of rules (def. no limit)\n");
-  fprintf(stderr,"\t\t-x mul         largest char ignored by rules (def. none)\n\n");
+  fprintf(stderr,"\t\t-x maxIC       largest char ignored in rule creation (def. none)\n\n");
   exit(1);
 }
