@@ -26,12 +26,11 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 #include <stdio.h>
 
-int main (int c, char **argv)
-
- { FILE *f = fopen (argv[1],"w");
-   int i;
-   while ((i=getchar())!=-1)
-  { fwrite(&i,1,sizeof(int),f);
-  }
-   fclose(f);
- }
+int main (int c, char **argv) {
+    FILE *f = fopen(argv[1], "w");
+    int i;
+    while ((i = getchar()) != -1) {
+        fwrite(&i, 1, sizeof(int), f);
+    }
+    fclose(f);
+}

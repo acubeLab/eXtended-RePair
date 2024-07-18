@@ -31,41 +31,44 @@ reIdx NullFreq = ((reIdx)1) << (8*sizeof(reIdx)-1);
 
 
 // malloc and exit if out of memory
-void *mymalloc(size_t size, int line, const char *file)
-{
-  void *v=malloc(size);
-  if(v==NULL) {
-    fprintf(stderr,"Out of memory allocating %zu bytes" 
-                 "at line %d of file %s\n",size,line,file);
-    exit(3);
-  }
-  return v;
+void *mymalloc(size_t size, int line, const char *file) {
+    void *v = malloc(size);
+    if (v == NULL) {
+        fprintf(stderr, "Out of memory allocating %zu bytes"
+                        "at line %d of file %s\n", size, line, file);
+        exit(3);
+    }
+    return v;
 }
 
-void *myrealloc(void *ptr, size_t size, int line, const char *file)
-{
-  void *v=realloc(ptr,size);
-  if(v==NULL) {
-    fprintf(stderr,"Out of memory allocating %zu bytes" 
-                 "at line %d of file %s\n",size,line,file);
-    exit(3);
-  }
-  return v;
+void *myrealloc(void *ptr, size_t size, int line, const char *file) {
+    void *v = realloc(ptr, size);
+    if (v == NULL) {
+        fprintf(stderr, "Out of memory allocating %zu bytes"
+                        "at line %d of file %s\n", size, line, file);
+        exit(3);
+    }
+    return v;
 }
 
-int blog (reIdx x) { int l=0;
-     while (x) { x>>=1; l++; }
-     return l;
+int blog (reIdx x) {
+    int l = 0;
+    while (x) {
+        x >>= 1;
+        l++;
+    }
+    return l;
 }
 
 // write error message and exit
 void quit(const char *msg, int line, char *file) {
-  if(errno==0)  fprintf(stderr,"== %d == %s\n",getpid(), msg);
-  else fprintf(stderr,"== %d == %s: %s\n",getpid(), msg,
-               strerror(errno));
-  fprintf(stderr,"== %d == Line: %d, File: %s\n",getpid(),line,file);
+    if (errno == 0) fprintf(stderr, "== %d == %s\n", getpid(), msg);
+    else
+        fprintf(stderr, "== %d == %s: %s\n", getpid(), msg,
+                strerror(errno));
+    fprintf(stderr, "== %d == Line: %d, File: %s\n", getpid(), line, file);
 
-  exit(1);
+    exit(1);
 }
 
 

@@ -38,29 +38,29 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 #include "array.h"
 #include "records.h"
 
-typedef struct 
-  { reIdx freq;
+typedef struct {
+    reIdx freq;
     int elems; // a pointer within freq array
-    int larger,smaller; // pointers within ff array
-  } Thfreq;
+    int larger, smaller; // pointers within ff array
+} Thfreq;
 
-typedef struct 
-  { int id;
-    int prev,next; // actually pointers within freq array
+typedef struct {
+    int id;
+    int prev, next; // actually pointers within freq array
     int fnode; // ptr to its freq node (ptr to ff)
-  } Thnode;
+} Thnode;
 
-typedef struct
-  { Thnode *freq; // space for all frequent nodes is preallocated, sqrt(u)
+typedef struct {
+    Thnode *freq; // space for all frequent nodes is preallocated, sqrt(u)
     int freef; // ptr to free list in freq
     Thfreq *ff; // space for all frequencies of frequent nodes prealloc idem
     int freeff; // ptr to free list in ff
-    int smallest,largest; // list of frequent ones (ptrs in ff)
+    int smallest, largest; // list of frequent ones (ptrs in ff)
     Tarray *infreq; // vectors for infrequent ones
     int sqrtu;
     int max;  // max freq heap used
     Trarray *Rec; // records
-  } Theap;
+} Theap;
 
 Theap createHeap (reIdx u, Trarray *Rec, float factor, int minsize); 
         // creates new empty heap

@@ -31,28 +31,28 @@ Chile. Blanco Encalada 2120, Santiago, Chile. gnavarro@dcc.uchile.cl
 
 #include "basics.h"
 
-typedef struct
-   { reIdx prev,next;
-   } Tlist; // list of prev next equal char
+typedef struct {
+    reIdx prev, next;
+} Tlist; // list of prev next equal char
 
-typedef struct
-   { Tpair pair; // pair content
-     reIdx freq; // frequency
-     reIdx cpos; // 1st position in C
-     int hpos; // position in heap
-     int kpos; // position in hash
-   } Trecord;
+typedef struct {
+    Tpair pair; // pair content
+    reIdx freq; // frequency
+    reIdx cpos; // 1st position in C
+    int hpos; // position in heap
+    int kpos; // position in hash
+} Trecord;
 
-typedef struct
-   { Trecord *records; 
-     int maxsize;  
-     int size;
-     float factor;
-     int minsize;
-     void *Hash;  // Thash *
-     void *Heap; // Theap *
-     void *List; // Tlist *
-   } Trarray;
+typedef struct {
+    Trecord *records;
+    int maxsize;
+    int size;
+    float factor;
+    int minsize;
+    void *Hash;  // Thash *
+    void *Heap; // Theap *
+    void *List; // Tlist *
+} Trarray;
 
 #include "heap.h"
 #include "hash.h"
